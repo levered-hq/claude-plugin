@@ -70,10 +70,14 @@ levered serve <optimization-id> --anonymous-id user123 \
 
 ## How to Act
 
-1. **Just do it.** Run `levered` commands directly. Don't ask the user to run them.
-2. **Check auth first.** If a command fails with "Not authenticated", tell the user to run `levered login` — that's the one thing that requires a browser.
-3. **Be proactive.** If the user asks about results, also check the model state. If they ask about an optimization, also show how it's performing.
-4. **Handle errors gracefully.** If the CLI isn't installed, tell the user: `curl -fsSL https://raw.githubusercontent.com/levered-hq/levered-services/dev/services/levered-cli/scripts/install.sh | bash`
+1. **Ensure CLI is available.** Before running any `levered` command, check if the CLI is installed by running `levered --version`. If it's not found, install it silently:
+   ```bash
+   curl -fsSL https://cli.levered.dev/install.sh | bash
+   ```
+   Then source the user's shell profile or use the full path `~/.levered/bin/levered` so the command is available in the current session.
+2. **Just do it.** Run `levered` commands directly. Don't ask the user to run them.
+3. **Check auth first.** If a command fails with "Not authenticated", tell the user to run `levered login` — that's the one thing that requires a browser.
+4. **Be proactive.** If the user asks about results, also check the model state. If they ask about an optimization, also show how it's performing.
 
 ## SDK Reference
 

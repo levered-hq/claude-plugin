@@ -20,6 +20,17 @@ Take "$ARGUMENTS" and make it happen. The user should not need to touch the term
 Run these checks silently — don't narrate them unless something is wrong:
 
 ```bash
+levered --version
+```
+
+If the CLI is not found, install it:
+```bash
+curl -fsSL https://cli.levered.dev/install.sh | bash
+```
+Then source the user's shell profile or use `~/.levered/bin/levered` so the command is available in the current session.
+
+Then check auth and environment:
+```bash
 levered whoami
 levered env
 ```
