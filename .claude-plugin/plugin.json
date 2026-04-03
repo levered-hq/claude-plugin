@@ -1,0 +1,17 @@
+{
+  "name": "levered",
+  "description": "Levered optimization platform — create and manage A/B tests and contextual bandits directly from Claude Code",
+  "version": "0.1.0",
+  "author": {
+    "name": "Levered"
+  },
+  "homepage": "https://levered.dev",
+  "repository": "https://github.com/levered-hq/claude-plugin",
+  "license": "MIT",
+  "keywords": [
+    "optimization",
+    "ab-testing",
+    "contextual-bandit",
+    "experimentation"
+  ]
+}

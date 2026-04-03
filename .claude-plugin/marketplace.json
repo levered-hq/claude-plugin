@@ -1,0 +1,13 @@
+{
+  "plugins": [
+    {
+      "name": "levered",
+      "description": "Levered optimization platform — create and manage A/B tests and contextual bandits directly from Claude Code",
+      "version": "0.1.0",
+      "source": {
+        "type": "local",
+        "path": "."
+      }
+    }
+  ]
+}
