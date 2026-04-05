@@ -76,18 +76,30 @@ Choose a clear, descriptive name. Don't ask the user what to name it.
 
 ### 5. Integrate the SDK
 
-This is the most important step. Modify the user's code to:
+This is the most important step. Docs: [Integrate the SDK](https://docs.levered.dev/docs/getting-started/integrate-sdk). Modify the user's code to:
 
 1. **Install the SDK** if not already present:
    ```bash
    npm install @levered_dev/sdk
    ```
 
-2. **Add the provider** (React apps) — find where the app root is and wrap it:
+2. **Add the provider** (React apps) — find where the app root is and wrap it. The `onExposure` callback is **required** — without it, Levered has no data to train on:
    ```tsx
    import { LeveredProvider } from '@levered_dev/sdk/react';
 
-   <LeveredProvider apiUrl="https://api.levered.dev" anonymousId={anonymousId}>
+   <LeveredProvider
+     apiUrl="https://api.levered.dev"
+     anonymousId={anonymousId}
+     onExposure={(exposure) => {
+       // Log to the user's warehouse/analytics pipeline
+       analytics.track('levered_exposure', {
+         optimization_id: exposure.optimizationId,
+         anonymous_id: exposure.anonymousId,
+         variant: exposure.variant,
+         timestamp: new Date().toISOString(),
+       });
+     }}
+   >
      ...
    </LeveredProvider>
    ```
@@ -106,6 +118,8 @@ This is the most important step. Modify the user's code to:
 
 5. **Handle anonymous ID** — look for existing user ID patterns in the codebase (cookies, session IDs, analytics IDs). Use whatever the app already has. If nothing exists, generate a UUID stored in localStorage.
 
+6. **Set up exposure logging** — look for existing analytics/tracking in the codebase (Segment, Rudderstack, PostHog, direct warehouse inserts). Use whatever pipeline the app already has. The exposure must land in the warehouse with `anonymous_id`, `optimization_id`, `variant`, and `timestamp` columns so Levered can join with reward data.
+
 For non-React apps, use `LeveredClient` directly instead of the hook.
 
 ### 6. Summarize
@@ -114,7 +128,9 @@ Tell the user what you did in 3-4 sentences:
 - What optimization was created (name + ID)
 - What design factors and levels you chose
 - Where in their code the SDK was integrated
+- How exposure logging was set up
 - What they need to do next (deploy, and rewards will start flowing)
+- Link to relevant docs for further reading (e.g., [Getting Started](https://docs.levered.dev/docs/getting-started))
 
 Don't dump CLI output. Don't over-explain. Be brief and confident.
 

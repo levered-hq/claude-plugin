@@ -9,6 +9,8 @@ allowed-tools: Bash(levered *), Read, Grep, Glob, Edit, Write
 
 You are an expert on the Levered optimization platform. When Levered topics come up, you act autonomously — run CLI commands, read/write code, and get things done without asking the user to do anything manually.
 
+**Documentation**: The full Levered docs are at [docs.levered.dev](https://docs.levered.dev). When explaining concepts or setup steps, link to the relevant page so the user can read more.
+
 ## CLI Reference
 
 The `levered` CLI is installed on this machine. Just run commands directly — the output is human-readable tables you can parse.
@@ -51,13 +53,22 @@ levered warehouse status                                           # Check wareh
 levered warehouse connect --provider bigquery \
   --project-id <gcp-project> --dataset-id <dataset> \
   --credentials-file <path>                                        # Connect warehouse
+levered warehouse connect --provider snowflake \
+  --account <account-id> --warehouse <wh> \
+  --database <db> --schema <schema> \
+  --username <user> --password <pass>                              # Connect Snowflake
+levered warehouse test                                             # Test warehouse connection
 levered warehouse tables                                           # List tables
 levered warehouse columns <table>                                  # List columns
 levered warehouse query --sql "SELECT ..."                         # Run SQL query
 levered warehouse preview --sql "SELECT ..."                       # Preview query results
 levered metrics list                                               # List metrics
 levered metrics create --name "..." --sql "SELECT ..." \
-  --anonymous-id-col anonymous_id --timestamp-col timestamp        # Create metric
+  --anonymous-id-col anonymous_id --timestamp-col timestamp \
+  --reward-type bool                                               # Create boolean metric
+levered metrics create --name "..." --sql "SELECT ..." \
+  --anonymous-id-col anonymous_id --timestamp-col timestamp \
+  --value-col value --reward-type numeric                          # Create numeric metric
 levered metrics preview <id>                                       # Preview metric data
 ```
 
@@ -78,51 +89,135 @@ levered serve <optimization-id> --anonymous-id user123 \
 2. **Just do it.** Run `levered` commands directly. Don't ask the user to run them.
 3. **Check auth first.** If a command fails with "Not authenticated", tell the user to run `levered login` — that's the one thing that requires a browser.
 4. **Be proactive.** If the user asks about results, also check the model state. If they ask about an optimization, also show how it's performing.
+5. **Link to docs.** When explaining setup steps or concepts, include a link to the relevant page at `docs.levered.dev` (e.g., [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)).
+
+## Warehouse Setup Guide
+
+When a user needs to connect their warehouse, guide them through it. Docs: [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)
+
+### BigQuery
+The user needs:
+- A GCP **Project ID** and **Dataset ID**
+- A service account JSON key with **BigQuery Data Viewer** and **BigQuery Job User** roles
+
+```bash
+levered warehouse connect \
+  --provider bigquery \
+  --project-id my-company-prod \
+  --dataset-id analytics \
+  --credentials-file ./service-account-key.json
+```
+
+### Snowflake
+The user needs:
+- **Account identifier** (e.g. `xy12345.us-east-1`), **Warehouse**, **Database**, **Schema**
+- A username/password with read access
+
+Recommend they create a read-only role and user:
+```sql
+CREATE ROLE levered_reader;
+GRANT USAGE ON WAREHOUSE <wh> TO ROLE levered_reader;
+GRANT USAGE ON DATABASE <db> TO ROLE levered_reader;
+GRANT USAGE ON SCHEMA <db>.<schema> TO ROLE levered_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA <db>.<schema> TO ROLE levered_reader;
+CREATE USER levered_svc PASSWORD='...' DEFAULT_ROLE=levered_reader DEFAULT_WAREHOUSE=<wh>;
+GRANT ROLE levered_reader TO USER levered_svc;
+```
+
+Always verify with `levered warehouse test` after connecting.
+
+## Metrics Guide
+
+Metrics define what counts as a reward. Docs: [Define metrics](https://docs.levered.dev/docs/getting-started/define-metrics)
+
+### Column mapping
+A metric query must return:
+- `anonymous_id` (required) — the user identifier, must match the `anonymousId` in the SDK
+- `timestamp` (required) — when the reward event occurred
+- `value` (only for numeric rewards) — the reward amount
+
+### Reward types
+- **Boolean (`bool`)** — any row returned = positive reward (e.g., user signed up)
+- **Numeric** — uses the `value` column to weight rewards (e.g., revenue)
+
+### The `@start_date` parameter
+Levered injects `@start_date` at training time. Always include it in your `WHERE` clause to avoid full table scans:
+```sql
+SELECT user_id AS anonymous_id, converted_at AS timestamp
+FROM conversions
+WHERE converted_at >= @start_date
+```
+
+### Key rule
+The `anonymous_id` in the metric query must match the `anonymousId` passed in the SDK. If these don't match, Levered can't join exposures with rewards and the model won't learn.
 
 ## SDK Reference
 
-The Levered SDK (`@levered_dev/sdk`) is how optimizations get integrated into code. Know this so you can help integrate or debug.
+The Levered SDK (`@levered_dev/sdk`) is how optimizations get integrated into code. Docs: [SDK Reference](https://docs.levered.dev/docs/sdk)
+
+### Exposure logging (critical)
+
+Levered does **not** receive exposure events directly. You must log them to your data warehouse yourself via the `onExposure` callback. Without exposure logging, Levered has no data to train on.
+
+An exposure event needs: `optimization_id`, `anonymous_id`, `variant` (the full assignment), and `timestamp`.
+
+### React
+Docs: [React integration](https://docs.levered.dev/docs/sdk/react)
+
+```tsx
+import { LeveredProvider, useVariant } from '@levered_dev/sdk/react';
+
+// 1. Wrap app with provider — onExposure is required
+<LeveredProvider
+  apiUrl="https://api.levered.dev"
+  anonymousId={userId}
+  onExposure={(exposure) => {
+    // Log to your warehouse via Segment, Rudderstack, direct insert, etc.
+    analytics.track('levered_exposure', {
+      optimization_id: exposure.optimizationId,
+      anonymous_id: exposure.anonymousId,
+      variant: exposure.variant,
+      timestamp: new Date().toISOString(),
+    });
+  }}
+>
+  <App />
+</LeveredProvider>
+
+// 2. Use variant in component — fallback = current values (no change if API is down)
+const { variant, isLoading } = useVariant({
+  optimizationId: '<uuid>',
+  fallback: { headline: 'Default', cta_text: 'Click' },
+  context: { device: 'mobile' },  // optional — for CMAB personalization
+});
+
+// variant.headline, variant.cta_text — always available
+```
 
 ### Vanilla JS/TS
+Docs: [Vanilla JavaScript](https://docs.levered.dev/docs/sdk/vanilla)
+
 ```ts
 import { LeveredClient } from '@levered_dev/sdk';
 
 const client = new LeveredClient({
   apiUrl: 'https://api.levered.dev',
   onExposure: (event) => {
-    // Log to analytics: event.anonymousId, event.variant, event.optimizationId
+    // Log to your warehouse — this is required
+    analytics.track('levered_exposure', event);
   },
 });
 
 const result = await client.getVariant({
   anonymousId: 'user-123',
   optimizationId: '<uuid>',
-  context: { device: 'mobile' },  // optional CMAB context
+  context: { device: 'mobile' },  // optional
 });
 
 if (result) {
   // result.variant is Record<string, string | number | boolean>
   // e.g. { headline: "Fast", cta_text: "Try Now" }
 }
-```
-
-### React
-```tsx
-import { LeveredProvider, useVariant } from '@levered_dev/sdk/react';
-
-// Wrap app
-<LeveredProvider apiUrl="https://api.levered.dev" anonymousId={userId}>
-  <App />
-</LeveredProvider>
-
-// In component
-const { variant, isLoading } = useVariant({
-  optimizationId: '<uuid>',
-  fallback: { headline: 'Default', cta_text: 'Click' },
-  context: { device: 'mobile' },  // optional
-});
-
-// variant.headline, variant.cta_text — always available (fallback while loading)
 ```
 
 ### Admin Menu (dev/staging)
@@ -140,6 +235,33 @@ import { LeveredAdminMenu } from '@levered_dev/sdk/react';
 />
 ```
 
+## Troubleshooting
+
+### Warehouse connection fails
+- **BigQuery**: Confirm service account has `BigQuery Data Viewer` + `BigQuery Job User` roles. Check project ID and dataset ID.
+- **Snowflake**: Account identifier must include region (e.g. `xy12345.us-east-1`). User needs `USAGE` on warehouse, database, and schema.
+- Run `levered warehouse test` to verify.
+
+### Model not learning / no lift
+- Check that exposures are being logged to the warehouse (query the exposure table).
+- Verify that `anonymous_id` in exposures matches `anonymous_id` in the reward metric query.
+- Run `levered metrics preview <id>` to confirm reward data is flowing.
+- Run `levered optimizations observations <id>` to see training data.
+
+### SDK returns fallback values
+- Check `levered optimizations show <id>` — is the optimization `live`?
+- Verify the API URL is correct (`https://api.levered.dev` for prod).
+- The SDK has a 2-second timeout — if the API is slow, it returns the fallback gracefully.
+
 ## Concepts (for your reference)
 
 For detailed concepts, read the [concepts reference](concepts.md) when needed.
+
+**Key doc links to share with users:**
+- [Getting Started](https://docs.levered.dev/docs/getting-started) — end-to-end setup guide
+- [Connect Warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse) — BigQuery and Snowflake setup
+- [Define Metrics](https://docs.levered.dev/docs/getting-started/define-metrics) — SQL queries for rewards
+- [Integrate SDK](https://docs.levered.dev/docs/getting-started/integrate-sdk) — JavaScript SDK setup
+- [Concepts: Optimizations](https://docs.levered.dev/docs/concepts/optimizations) — how optimizations work
+- [CLI Commands](https://docs.levered.dev/docs/cli/commands) — full CLI reference
+- [API Reference](https://docs.levered.dev/docs/api) — REST API endpoints
