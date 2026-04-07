@@ -1,11 +1,12 @@
 # Levered Plugin for Claude Code
 
-Create and manage growth optimizations using multi-armed bandits and contextual bandits directly from Claude Code.
+Create and manage A/B tests and contextual bandits directly from Claude Code.
 
 ## Install
 
 ```
-/plugin install levered-hq/claude-plugin
+/plugin marketplace add levered-hq/claude-plugin
+/plugin install levered@levered
 ```
 
 ## What it does
