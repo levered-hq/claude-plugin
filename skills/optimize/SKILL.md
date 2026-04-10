@@ -56,7 +56,7 @@ levered warehouse status
 levered metrics list
 ```
 
-- If no warehouse connected, tell the user they need to connect one and offer to help.
+- If no warehouse connected, tell the user to set one up in the Levered dashboard (https://app.levered.dev — go to Settings > Warehouse). This is a one-time setup best done from the UI. Stop and wait for them to complete it before continuing.
 - If no suitable reward metric exists, create one.
 - If a suitable metric already exists, use it.
 

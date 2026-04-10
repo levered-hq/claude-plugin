@@ -50,14 +50,6 @@ levered models delete <model-id>         # Delete a model
 ### Warehouse & Metrics
 ```
 levered warehouse status                                           # Check warehouse connection
-levered warehouse connect --provider bigquery \
-  --project-id <gcp-project> --dataset-id <dataset> \
-  --credentials-file <path>                                        # Connect warehouse
-levered warehouse connect --provider snowflake \
-  --account <account-id> --warehouse <wh> \
-  --database <db> --schema <schema> \
-  --username <user> --password <pass>                              # Connect Snowflake
-levered warehouse test                                             # Test warehouse connection
 levered warehouse tables                                           # List tables
 levered warehouse columns <table>                                  # List columns
 levered warehouse query --sql "SELECT ..."                         # Run SQL query
@@ -91,40 +83,13 @@ levered serve <optimization-id> --anonymous-id user123 \
 4. **Be proactive.** If the user asks about results, also check the model state. If they ask about an optimization, also show how it's performing.
 5. **Link to docs.** When explaining setup steps or concepts, include a link to the relevant page at `docs.levered.dev` (e.g., [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)).
 
-## Warehouse Setup Guide
+## Warehouse Setup
 
-When a user needs to connect their warehouse, guide them through it. Docs: [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)
+Warehouse connection is a one-time setup best done from the dashboard UI. If no warehouse is connected (`levered warehouse status` shows "Not connected"), direct the user to:
 
-### BigQuery
-The user needs:
-- A GCP **Project ID** and **Dataset ID**
-- A service account JSON key with **BigQuery Data Viewer** and **BigQuery Job User** roles
+**[Settings > Warehouse](https://app.levered.dev)** in the Levered dashboard.
 
-```bash
-levered warehouse connect \
-  --provider bigquery \
-  --project-id my-company-prod \
-  --dataset-id analytics \
-  --credentials-file ./service-account-key.json
-```
-
-### Snowflake
-The user needs:
-- **Account identifier** (e.g. `xy12345.us-east-1`), **Warehouse**, **Database**, **Schema**
-- A username/password with read access
-
-Recommend they create a read-only role and user:
-```sql
-CREATE ROLE levered_reader;
-GRANT USAGE ON WAREHOUSE <wh> TO ROLE levered_reader;
-GRANT USAGE ON DATABASE <db> TO ROLE levered_reader;
-GRANT USAGE ON SCHEMA <db>.<schema> TO ROLE levered_reader;
-GRANT SELECT ON ALL TABLES IN SCHEMA <db>.<schema> TO ROLE levered_reader;
-CREATE USER levered_svc PASSWORD='...' DEFAULT_ROLE=levered_reader DEFAULT_WAREHOUSE=<wh>;
-GRANT ROLE levered_reader TO USER levered_svc;
-```
-
-Always verify with `levered warehouse test` after connecting.
+Supported providers: BigQuery, PostgreSQL, Snowflake. Docs: [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)
 
 ## Metrics Guide
 
@@ -238,9 +203,8 @@ import { LeveredAdminMenu } from '@levered_dev/sdk/react';
 ## Troubleshooting
 
 ### Warehouse connection fails
-- **BigQuery**: Confirm service account has `BigQuery Data Viewer` + `BigQuery Job User` roles. Check project ID and dataset ID.
-- **Snowflake**: Account identifier must include region (e.g. `xy12345.us-east-1`). User needs `USAGE` on warehouse, database, and schema.
-- Run `levered warehouse test` to verify.
+- Check `levered warehouse status` to see if a warehouse is connected.
+- If not connected, direct the user to set it up in the dashboard (Settings > Warehouse).
 
 ### Model not learning / no lift
 - Check that exposures are being logged to the warehouse (query the exposure table).

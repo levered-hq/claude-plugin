@@ -1,6 +1,6 @@
 # Levered Plugin for Claude Code
 
-Turns Claude into a growth engineer that continuously optimizes your most conversion-critical product flows.
+Create and manage A/B tests and contextual bandits directly from Claude Code.
 
 ## Install
 
