@@ -27,7 +27,9 @@ levered login                            # Authenticate (opens browser — user 
 ```
 levered optimizations list                                 # List all optimizations
 levered optimizations show <id>                            # Show optimization details
+levered optimizations show <id> --json                     # Show details as JSON
 levered optimizations results <id>                         # Get results: lift, variants, factor importance
+levered optimizations results <id> --json                  # Get results as JSON (for parsing winner)
 levered optimizations create \
   --name "..." \
   --design-factors '[{"name":"headline","levels":["Fast","Reliable","Simple"]}]' \
@@ -82,6 +84,10 @@ levered serve <optimization-id> --anonymous-id user123 \
 3. **Check auth first.** If a command fails with "Not authenticated", tell the user to run `levered login` — that's the one thing that requires a browser.
 4. **Be proactive.** If the user asks about results, also check the model state. If they ask about an optimization, also show how it's performing.
 5. **Link to docs.** When explaining setup steps or concepts, include a link to the relevant page at `docs.levered.dev` (e.g., [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)).
+6. **Check for completed optimizations.** When you activate, run `levered optimizations list` and check the STATUS column. If any optimization shows `completed`:
+   - Tell the user which optimization(s) completed (name + ID)
+   - Ask if they want to apply the winning variant into their code — follow the "Applying a Completed Optimization" section below
+   - If the user is asking about a *specific* optimization that is completed, surface this immediately before doing anything else
 
 ## Warehouse Setup
 
@@ -216,6 +222,66 @@ import { LeveredAdminMenu } from '@levered_dev/sdk/react';
 - Check `levered optimizations show <id>` — is the optimization `live`?
 - Verify the API URL is correct (`https://api.levered.dev` for prod).
 - The SDK has a 2-second timeout — if the API is slow, it returns the fallback gracefully.
+
+## Applying a Completed Optimization
+
+When an optimization reaches `completed` status, the winning variant should be hardcoded into the code and the SDK integration removed for that optimization. Always ask the user before modifying code.
+
+### Step 1: Determine the winner
+
+```bash
+levered optimizations results <id> --json
+```
+
+Parse the JSON output. Each variant has: `exposures`, `conversions`, `rate`, `p_best`, `e_reward`, `weight`. The winner is the variant with the highest `weight`.
+
+**Validate before proceeding:**
+- If total exposures across all variants is **0**: tell the user the optimization has no data. Suggest checking exposure logging. Do NOT apply a winner.
+- If the highest weight is **below 0.7**: tell the user results are inconclusive — the model hasn't converged on a clear winner. Ask if they want to pick one anyway or keep the optimization running.
+- If the highest weight is **>= 0.7**: this is a clear winner. Proceed.
+
+### Step 2: Find the integration code
+
+Grep the codebase for the optimization UUID. Look for:
+- `useVariant({ optimizationId: '<id>' ... })` calls (React)
+- `client.getVariant({ optimizationId: '<id>' ... })` calls (vanilla JS)
+- Constants that store the optimization ID (e.g., `const OPTIMIZATION_ID = '<id>'`)
+- The fallback object in the `useVariant` call — this tells you the factor names
+
+### Step 3: Hardcode the winning values
+
+Replace the dynamic variant lookup with a static constant. Keep the same variable name so all downstream references keep working.
+
+**Before:**
+```tsx
+const { variant } = useVariant({
+  optimizationId: HERO_OPTIMIZATION_ID,
+  fallback: { headline: 'Default', cta_text: 'Click' },
+});
+```
+
+**After:**
+```tsx
+const variant = { headline: 'Fast', cta_text: 'Try Now' };
+```
+
+Use the winning variant's actual values from the results output.
+
+### Step 4: Clean up
+
+1. Remove the optimization ID constant (e.g., `const HERO_OPTIMIZATION_ID = '...'`)
+2. Remove the `useVariant` import **if** no other `useVariant` calls remain in the file
+3. If this was the **last** optimization using the Levered SDK in the entire app, ask the user if they want to remove the `LeveredProvider` wrapper and uninstall `@levered_dev/sdk`
+
+### Step 5: Archive (optional)
+
+Ask the user if they want to archive the completed optimization:
+
+```bash
+levered optimizations archive <id> -y
+```
+
+This keeps the dashboard clean. The data is preserved.
 
 ## Concepts (for your reference)
 
