@@ -38,23 +38,7 @@ levered env
 If not authenticated, tell the user to run `levered login` (requires a browser) and stop.
 If not on the right environment, switch with `levered env use prod` (or whichever makes sense).
 
-### 2. Check for Existing Optimizations
-
-Before creating anything new, check if the target already has an optimization:
-
-```bash
-levered optimizations list
-```
-
-Also grep the codebase for existing `useVariant` or `getVariant` calls near the code the user mentioned — there may already be an optimization covering the same area.
-
-- **If a matching optimization exists with status `completed`**: Tell the user there's already a completed optimization for this. Show the name and ID. Ask if they want to:
-  1. **Apply the winner** — get results with `levered optimizations results <id> --json`, find the variant with the highest `weight`, hardcode it into the code, remove the `useVariant` hook, and clean up. See the levered skill's "Applying a Completed Optimization" section for the full procedure.
-  2. **Create a new optimization anyway** — proceed to Step 3.
-- **If a matching optimization exists with status `live`**: Tell the user there's already a live optimization running. Show the name, ID, and current results. Ask if they want to wait for it to complete, or create a separate optimization for a different aspect.
-- **If no matching optimization exists**: Proceed to Step 3.
-
-### 3. Understand What to Optimize
+### 2. Understand What to Optimize
 
 Read the user's codebase. Find the component, page, or feature they want to optimize. Look at:
 - The UI code (what text, layout, or behavior varies)
@@ -65,7 +49,7 @@ From this, determine:
 - **Design factors**: What should vary and what are good levels? Be creative but grounded. If optimizing a headline, propose 4-6 compelling alternatives. If optimizing a CTA, propose 3-4 action-oriented options.
 - **Reward**: What counts as success? (click, signup, purchase, etc.)
 
-### 4. Check Prerequisites
+### 3. Check Prerequisites
 
 ```bash
 levered warehouse status
@@ -76,7 +60,7 @@ levered metrics list
 - If no suitable reward metric exists, create one.
 - If a suitable metric already exists, use it.
 
-### 5. Create the Optimization
+### 4. Create the Optimization
 
 ```bash
 levered optimizations create \
@@ -90,7 +74,7 @@ levered optimizations create \
 
 Choose a clear, descriptive name. Don't ask the user what to name it.
 
-### 6. Integrate the SDK
+### 5. Integrate the SDK
 
 This is the most important step. Docs: [Integrate the SDK](https://docs.levered.dev/docs/getting-started/integrate-sdk). Modify the user's code to:
 
@@ -138,7 +122,7 @@ This is the most important step. Docs: [Integrate the SDK](https://docs.levered.
 
 For non-React apps, use `LeveredClient` directly instead of the hook.
 
-### 7. Summarize
+### 6. Summarize
 
 Tell the user what you did in 3-4 sentences:
 - What optimization was created (name + ID)
@@ -157,4 +141,3 @@ Don't dump CLI output. Don't over-explain. Be brief and confident.
 - **Fallback values = current values.** The fallback in `useVariant` should always be what the component currently shows, so nothing changes if the API is down.
 - **One component at a time.** Don't try to optimize the entire page. Focus on what the user asked about.
 - **Show the optimization ID.** The user will need it to check results later.
-- **Detect completion.** If the user asks to optimize something that already has a completed optimization, don't blindly create a new one. Surface the completed results and offer to apply the winner first.
