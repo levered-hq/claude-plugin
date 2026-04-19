@@ -12,10 +12,21 @@ An optimization is the top-level entity. It defines what you're testing (design 
 ### Design Factors
 The things you're varying. Each factor has a name and a list of levels (possible values). The combination of all factor levels produces the variant space.
 
-Example:
-- Factor `headline` with levels `["Fast", "Reliable", "Simple"]`
-- Factor `cta_text` with levels `["Try Now", "Get Started"]`
-- This produces 3 x 2 = 6 total variants
+A factor can be anything the app can branch on at render/serve time — not just text. Useful categories:
+
+- **Structural**: presence/order of steps in a flow, e.g. `signup_step` with levels `["before_checkout", "after_checkout", "skipped"]`
+- **Flow**: when something happens, e.g. `email_gate` with levels `["upfront", "after_preview", "never"]`
+- **Layout**: composition of a page/section, e.g. `hero_layout` with levels `["single_column", "split_with_image", "video_hero"]`
+- **Content presence**: show/hide sections, e.g. `show_testimonials` with levels `["yes", "no"]`
+- **Defaults**: pre-selected options, e.g. `default_plan` with levels `["monthly", "annual", "lifetime"]`
+- **Copy**: headline, CTA wording, value prop framing, e.g. `headline` with levels `["Fast", "Reliable", "Simple"]`
+
+Example combining two factors:
+- Factor `hero_layout` with levels `["single_column", "split_with_image"]`
+- Factor `cta_text` with levels `["Try Now", "Get Started", "See It Work"]`
+- This produces 2 x 3 = 6 total variants
+
+Good designs pick factors where *each* factor is plausibly worth testing on its own — don't add factors just to fill space. The strongest factors usually change structure, flow, or layout; copy-only designs tend to produce modest lift.
 
 ### Context Factors (optional)
 Attributes about the user/session that the model uses to personalize variant selection. Examples: `device`, `country`, `time_of_day`. When context factors are provided, the model learns which variants work best for which contexts (true contextual bandit).
