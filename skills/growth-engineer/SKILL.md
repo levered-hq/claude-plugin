@@ -1,5 +1,5 @@
 ---
-name: optimize
+name: growth-engineer
 description: End-to-end optimization setup. Claude proposes a design, prototypes the variants in your app so you can preview and iterate in the browser, and only wires up the Levered backend once you approve.
 argument-hint: [what to optimize]
 allowed-tools: Bash(levered *), Bash(npm *), Bash(npx *), Bash(yarn *), Bash(pnpm *), Read, Grep, Glob, Edit, Write
@@ -44,9 +44,15 @@ Read the user's codebase. Find the component, page, or feature they want to opti
 - The existing analytics/tracking (how conversions are measured)
 - The tech stack (React? Next.js? Vanilla? Server-rendered?)
 
-From this, determine:
+**Reward first — always.** Factors only make sense in the context of a specific goal metric. "Optimize for trial started" implies very different variants than "optimize for D7 retention" or "optimize for revenue per user." So before drafting any factor table:
 
-- **Reward**: What counts as success? (click, signup, purchase, activation, revenue, etc.)
+- If the user's brief already names a clear goal ("optimize the trial conversion rate", "maximize daily active users"), take that as the reward and continue.
+- If the goal is unstated or ambiguous ("optimize the onboarding", "make the paywall better"), **stop and ask** what metric to optimize for. Don't guess based on what the page "looks like it's for." Present a short list of plausible candidates (e.g., for a paywall: trial started, purchase, revenue/user, monthly-vs-yearly mix) and get a clear answer before moving on.
+
+Never pick the reward metric silently via name-matching against `levered metrics list`. Metric selection — including whether to reuse an existing metric or create a new one — happens in step 6, but the *semantic* reward ("what event counts as a win") must be user-confirmed before you propose any factors.
+
+Once the reward is locked:
+
 - **Design factors**: *What has the highest potential to move the reward metric?* Pick the biggest levers available, not the safest ones. Copy is one lever — often not the strongest. Consider the full space:
   - **Structural**: add or remove a step, collapse multi-step into single-step (or vice versa), change the order of steps, skip a screen, consolidate or split forms
   - **Flow**: change what happens on load vs. on click, gate vs. ungate content, defer sign-up vs. require it upfront, auto-advance vs. manual
@@ -151,7 +157,7 @@ levered metrics list
 - If not authenticated, tell the user to run `levered login` (requires a browser) and stop.
 - If not on the right environment, switch with `levered env use <prod|testing>` based on what the app's `apiUrl` points at.
 - If no warehouse connected, tell the user to set one up in the Levered dashboard (https://app.levered.dev — Settings > Warehouse). Stop until they complete it.
-- If no suitable reward metric exists, create one. If one exists, use it.
+- **Map the user-confirmed reward (from step 2) to a concrete metric.** Show the user the candidates from `levered metrics list` along with what each one's SQL actually captures, and confirm which to use (or offer to create a new one). Never pick by name-matching alone — a metric called "Purchase" may not track what the user actually wants rewarded. Only proceed once the user confirms the metric ID to bind to the optimization.
 
 ### 7. Create the Optimization
 

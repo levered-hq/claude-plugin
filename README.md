@@ -23,8 +23,8 @@ Tell Claude what you want to optimize and it handles the rest:
 
 | Skill | Trigger | Description |
 |-------|---------|-------------|
-| `levered` | Automatic | Activates when you mention optimizations, A/B tests, experiments, variants, or bandits. Runs CLI commands and helps with the platform. |
-| `optimize` | `/optimize [what to optimize]` | End-to-end workflow. Analyzes your code, creates the optimization, integrates the SDK. |
+| `levered-platform` | Automatic | Activates when you mention optimizations, A/B tests, experiments, variants, or bandits. Runs CLI commands and helps with the platform. |
+| `growth-engineer` | `/growth-engineer [what to optimize]` | End-to-end workflow. Analyzes your code, creates the optimization, integrates the SDK. |
 
 ## Requirements
 
