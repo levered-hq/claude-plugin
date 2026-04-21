@@ -88,14 +88,33 @@ Once the user approves the design, implement the variants locally so they can cl
 
 For React apps, the preview tool is `LeveredAdminMenu` from `@levered_dev/sdk/react`. It's a floating admin pill that lets the user override factor values at runtime. Set it up like this:
 
-1. **Install the SDK if not already present** and wrap the app root in `LeveredProvider` — no `optimizationId` is needed for preview; you just need the provider so the menu component works:
+1. **Install the SDK if not already present** and wrap the app root in `LeveredProvider` — no `optimizationId` is needed for preview; you just need the provider so the menu component works. Pull the API URL from an env var using whichever style the app already uses, so the same build works against local / testing / prod. Default to prod only so the provider mounts — during prototype the admin menu overrides the variant, no API call is needed.
+
+   **Vite apps** (`import.meta.env` is Vite-only — `VITE_` prefix):
    ```tsx
    import { LeveredProvider } from '@levered_dev/sdk/react';
 
-   <LeveredProvider apiUrl="https://api.levered.dev" anonymousId={anonymousId}>
+   const LEVERED_API_URL =
+     import.meta.env.VITE_LEVERED_API_URL ?? 'https://api.levered.dev';
+
+   <LeveredProvider apiUrl={LEVERED_API_URL} anonymousId={anonymousId}>
      <App />
    </LeveredProvider>
    ```
+
+   **Next.js apps** (`NEXT_PUBLIC_` prefix required for client-side reads):
+   ```tsx
+   import { LeveredProvider } from '@levered_dev/sdk/react';
+
+   const LEVERED_API_URL =
+     process.env.NEXT_PUBLIC_LEVERED_API_URL ?? 'https://api.levered.dev';
+
+   <LeveredProvider apiUrl={LEVERED_API_URL} anonymousId={anonymousId}>
+     <App />
+   </LeveredProvider>
+   ```
+
+   For other setups, match the framework's own convention (CRA: `REACT_APP_`, etc.). Using the wrong prefix silently falls back to prod, so make sure the env var actually reaches the client bundle.
 
 2. **Define factors as local state**, with fallback values matching today's UI (so the baseline *is* the current experience):
    ```tsx
@@ -177,10 +196,10 @@ The `--design-factors` JSON must match the factors and levels the user just appr
 
 Now replace the local-override scaffolding with a real `useVariant` hook bound to the optimization you just created. The fallback must stay the same — it's already the current UI.
 
-1. **Add the `onExposure` callback to the provider.** Without it, Levered has no data to train on:
+1. **Add the `onExposure` callback to the provider.** Without it, Levered has no data to train on. Keep the env-driven `apiUrl` from the prototype step:
    ```tsx
    <LeveredProvider
-     apiUrl="https://api.levered.dev"
+     apiUrl={LEVERED_API_URL}
      anonymousId={anonymousId}
      onExposure={(exposure) => {
        analytics.track('levered_exposure', {
