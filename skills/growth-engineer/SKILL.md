@@ -80,6 +80,19 @@ Once the reward is locked:
 
 Before creating anything or touching code, present the proposed reward, factors, and hypothesis in a short message. Keep it to one short paragraph plus a factor table — not a menu of alternatives to pick from, but a concrete plan the user can approve or redirect. End with a single closing question like "Want me to prototype these in the app so you can click through them?"
 
+**Factor table format.** Use a markdown table with two columns: `Factor` and `Levels`. Render each level on **its own row** inside the Levels cell (use `<br>` to break lines). Never inline levels with " · " separators on a single line, and never prefix them with `L1:` / `L2:` / `L3:` — the position in the list already conveys order, and inline forms are hard to scan.
+
+**Don't narrate the rules you're following.** Present factors, levels, and the *positive* hypothesis for why they'll move the metric. Then stop. Do **not** add trailing lines like "no invented content / no fabricated stats" or "excluding colors since they don't move the metric" — these read as defensive and waste the user's attention on the obvious. Just follow the rule; don't announce that you're following it. If the user later asks why something is missing, explain then.
+
+Example:
+
+```markdown
+| Factor | Levels |
+|---|---|
+| `onboarding_length` | 2 questions (goal + frequency)<br>1 question (goal only) |
+| `plan_screen_emphasis` | Plan-first headline<br>Trial-first headline |
+```
+
 Do not edit application code yet. If they push back on a factor, revise and re-propose rather than starting the prototype.
 
 ### 4. Prototype with preview (no backend yet)
