@@ -28,6 +28,8 @@ Example combining two factors:
 
 Good designs pick factors where *each* factor is plausibly worth testing on its own — don't add factors just to fill space. The strongest factors usually change structure, flow, or layout; copy-only designs tend to produce modest lift.
 
+**Independent factors vs. composite "concepts".** Separate factors assume the dimensions are *independent levers* — any combination is valid and the model can mix and match (e.g. CTA wording × form length). The bandit is a factorization machine, so it optimizes each lever cheaply *and* learns which pairings interact. But when two dimensions only make sense in specific pairs — they jointly tell one story, like a hero visual and the headline it illustrates — model them as a **single composite factor** whose levels are the coherent combinations (`message: "trust headline + security line" / "speed headline + benefit line"`), not two factors whose cross-product has nonsensical cells. Composite factors also have fewer variants and converge faster. Rule of thumb: independent levers → separate factors (the safe default — over-factoring just learns slower and is recoverable); one coupled story → one composite factor, but only when you're confident the dimensions are inseparable, because composing hard-codes which pairings you assume are good and forfeits discovering an unexpected winner.
+
 ### Context Factors (optional)
 Attributes about the user/session that the model uses to personalize variant selection. Examples: `device`, `country`, `time_of_day`. When context factors are provided, the model learns which variants work best for which contexts (true contextual bandit).
 

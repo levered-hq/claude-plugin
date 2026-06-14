@@ -34,7 +34,9 @@ levered optimizations create \
   --reward-metric-id <uuid> \
   --model-type cmab \
   --reward-name reward \
-  --reward-type bool                                       # Create optimization
+  --reward-type bool \
+  --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
+                                                           # Create optimization
 levered optimizations update <id> --status live            # Update optimization status
 levered optimizations archive <id> -y                      # Archive optimization (use -y to skip confirmation)
 levered optimizations observations <id>                    # View observations/training data
