@@ -95,6 +95,47 @@ Warehouse connection is a one-time setup best done from the dashboard UI. If no 
 
 Supported providers: BigQuery, PostgreSQL, Snowflake. Docs: [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)
 
+## Managed Warehouse (Levered-hosted)
+
+The fastest setup. Instead of connecting BigQuery/Snowflake/Postgres, the org can use the **Managed Warehouse** — Levered hosts the dataset and the org **sends events to the ingestion API**. Enable it in the dashboard at **Settings > Warehouse > Managed Warehouse** ("Hosted by Levered"). Docs: [Managed Warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse/managed)
+
+When an org is on the managed warehouse, **exposures and rewards are written to Levered via the ingestion API** — there is no customer warehouse to query and no tables to create. Do **not** route them to a customer warehouse or rely on the SDK `onExposure` → your-own-warehouse path; instead POST them to Levered. Training reads the managed dataset automatically.
+
+### Authentication — API key
+
+Ingestion is authenticated with an **API key** (NOT the dashboard/Clerk session). Create one in the dashboard at **Settings > API Keys** — the secret is shown once. Send it as `Authorization: Bearer <api_key>` (or the `X-API-Key` header). When wiring code, read it from an env var (e.g. `LEVERED_API_KEY`).
+
+### Ingestion API
+
+Base URL `https://api.levered.dev/api/v2/ingest`. JSON batches of up to **500 events**, max **5 MB** per request.
+
+**`POST /api/v2/ingest/exposures`** — body `{ "events": [ … ] }`. Each exposure event:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `anonymous_id` | yes | User identifier — must match the reward's `anonymous_id` (the join key). |
+| `optimization_id` | yes | UUID; must belong to the org. |
+| `variant` | yes | The served variant, as a JSON object of factor → value. |
+| `context` | no | Context-factor values for this exposure. |
+| `timestamp` | no | ISO 8601 (with offset); defaults to server time. |
+| `idempotency_key` | no | Caller key to make retries safe. |
+
+**`POST /api/v2/ingest/rewards`** — body `{ "events": [ … ] }`. Each reward event:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `anonymous_id` | yes | Same id sent on the exposure. |
+| `name` | yes | Metric name, e.g. `signup_completed`. |
+| `value` | no | Numeric value; defaults to `1` (a count/conversion). |
+| `timestamp` | no | ISO 8601; defaults to server time. |
+| `optimization_id` | no | Pin to one optimization; omit for a global reward attributed by `name`. |
+| `properties` | no | Arbitrary JSON metadata. |
+| `idempotency_key` | no | Caller key to make retries safe. |
+
+Responses: `200` all accepted · `207` partial (inspect `rejected`) · `400` invalid payload · `403` unknown/unauthorized `optimization_id` · `409` org not on the managed warehouse · `503` transient write failure (retry the batch).
+
+When integrating an app on the managed warehouse: wire the SDK's `onExposure` callback to POST to `/ingest/exposures`, and POST to `/ingest/rewards` at the conversion point — both authenticated with the API key. Rewards attribute to exposures by `anonymous_id`, same as a connected warehouse.
+
 ## Metrics Guide
 
 Metrics define what counts as a reward. Docs: [Define metrics](https://docs.levered.dev/docs/getting-started/define-metrics)
@@ -126,7 +167,9 @@ The Levered SDK (`@levered_dev/sdk`) is how optimizations get integrated into co
 
 ### Exposure logging (critical)
 
-Levered does **not** receive exposure events directly. You must log them to your data warehouse yourself via the `onExposure` callback. Without exposure logging, Levered has no data to train on.
+With a **connected** warehouse, Levered does **not** receive exposure events directly — you log them to your own warehouse via the `onExposure` callback. Without exposure logging, Levered has no data to train on.
+
+**On the Managed Warehouse it's the opposite:** you send exposures (and rewards) **to Levered** via the ingestion API — point `onExposure` at `POST /api/v2/ingest/exposures` with the API key. See [Managed Warehouse](#managed-warehouse-levered-hosted) above. Check which the org is on with `levered warehouse status`.
 
 An exposure event needs: `optimization_id`, `anonymous_id`, `variant` (the full assignment), and `timestamp`.
 

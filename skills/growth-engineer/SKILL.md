@@ -196,7 +196,8 @@ levered metrics list
 
 - If not authenticated, tell the user to run `levered login` (requires a browser) and stop.
 - If not on the right environment, switch with `levered env use <prod|testing>` based on what the app's `apiUrl` points at.
-- If no warehouse connected, tell the user to set one up in the Levered dashboard (https://app.levered.dev — Settings > Warehouse). Stop until they complete it.
+- If no warehouse connected, tell the user to set one up in the Levered dashboard (https://app.levered.dev — Settings > Warehouse). The quickest option is the **Managed Warehouse** ("Hosted by Levered") — Levered hosts it and you send events to the ingestion API, with no warehouse to connect. Stop until they complete it.
+- **Note which warehouse the org is on.** If it's the **Managed Warehouse**, exposures and rewards are sent to Levered's ingestion API with an API key (not logged into a customer warehouse) — this changes how you wire tracking in step 8. See the Managed Warehouse section of the `levered-platform` skill for the endpoints + fields, and have the user create an API key at **Settings > API Keys**.
 - **Map the user-confirmed reward (from step 2) to a concrete metric.** Show the user the candidates from `levered metrics list` along with what each one's SQL actually captures, and confirm which to use (or offer to create a new one). Never pick by name-matching alone — a metric called "Purchase" may not track what the user actually wants rewarded. Only proceed once the user confirms the metric ID to bind to the optimization.
 
 ### 7. Create the Optimization
@@ -217,7 +218,7 @@ The `--design-factors` JSON must match the factors and levels the user just appr
 
 Now replace the local-override scaffolding with a real `useVariant` hook bound to the optimization you just created. The fallback must stay the same — it's already the current UI.
 
-1. **Add the `onExposure` callback to the provider.** Without it, Levered has no data to train on. Keep the env-driven `apiUrl` from the prototype step:
+1. **Add the `onExposure` callback to the provider.** Without it, Levered has no data to train on. Keep the env-driven `apiUrl` from the prototype step. For a **connected** warehouse, log the exposure into the customer's own warehouse (via their analytics pipeline):
    ```tsx
    <LeveredProvider
      apiUrl={LEVERED_API_URL}
@@ -234,6 +235,27 @@ Now replace the local-override scaffolding with a real `useVariant` hook bound t
      ...
    </LeveredProvider>
    ```
+
+   **If the org is on the Managed Warehouse** (from step 6), don't log to a customer warehouse — POST the exposure to Levered's ingestion API instead, and send the reward at the conversion point. Both use the API key from an env var (e.g. `LEVERED_API_KEY`):
+   ```tsx
+   onExposure={(exposure) =>
+     fetch(`${LEVERED_API_URL}/api/v2/ingest/exposures`, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         Authorization: `Bearer ${process.env.LEVERED_API_KEY}`,
+       },
+       body: JSON.stringify({
+         events: [{
+           anonymous_id: exposure.anonymousId,
+           optimization_id: exposure.optimizationId,
+           variant: exposure.variant,
+         }],
+       }),
+     })
+   }
+   ```
+   At the conversion point, `POST /api/v2/ingest/rewards` with `{ events: [{ anonymous_id, name: '<reward-name>', value: 1 }] }`. See the Managed Warehouse section of the `levered-platform` skill for all fields and response codes.
 
 2. **Swap `override` state for `useVariant`** in the target component:
    ```tsx

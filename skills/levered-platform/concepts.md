@@ -43,7 +43,7 @@ The success signal. Usually binary (bool) — did the user convert? Can also be 
 A SQL query against your connected data warehouse that defines how to measure rewards. Maps columns to `anonymous_id`, `timestamp`, and optionally `value`. Levered periodically runs this query to get fresh reward data.
 
 ### Warehouse Connection
-Levered connects to BigQuery or Snowflake to pull reward data. The connection is per-organization.
+Levered connects to BigQuery, Snowflake, or Postgres to pull exposure/reward data. The connection is per-organization. Alternatively, an org can use the **Managed Warehouse** (Levered-hosted): instead of connecting their own warehouse, they send exposures and rewards to Levered's ingestion API authenticated with an API key. See the Managed Warehouse section in `SKILL.md` for fields and endpoints.
 
 ### Exposures
 Each time a variant is served to a user, that's an exposure. Exposures are logged and joined with rewards for model training.
