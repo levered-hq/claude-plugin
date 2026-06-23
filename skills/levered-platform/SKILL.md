@@ -73,7 +73,10 @@ levered metrics preview <id>                                       # Preview met
 levered serve <optimization-id>                            # Get best variant
 levered serve <optimization-id> --anonymous-id user123 \
   --context '{"device":"mobile"}'                          # With context
+levered serve <optimization-id> --dry-run                  # Preview — no exposure logged, no training triggered
 ```
+
+**Always use `--dry-run` when spot-checking a live optimization.** A plain `levered serve` writes a real exposure, takes a sticky variant lock for that `anonymous_id`, and can trigger auto-training — so testing the endpoint pollutes metrics and training data. `--dry-run` runs the identical decision path and returns the same response shape, but writes nothing. Omit it only when you intend to log a real exposure.
 
 ## How to Act
 
@@ -160,6 +163,59 @@ WHERE converted_at >= @start_date
 
 ### Key rule
 The `anonymous_id` in the metric query must match the `anonymousId` passed in the SDK. If these don't match, Levered can't join exposures with rewards and the model won't learn.
+
+### On the Managed Warehouse — `SELECT *`, never project columns away
+
+The managed warehouse stores **every org's** rewards and exposures in two shared tables, so every read is automatically wrapped to force-scope it to your org and optimization:
+
+```sql
+SELECT * FROM ( <your metric sql> ) AS _levered_reward_scope
+WHERE _levered_reward_scope.organization_id = '<org>'
+  AND (_levered_reward_scope.optimization_id = '<opt>' OR _levered_reward_scope.optimization_id IS NULL)
+```
+
+That wrapper references `organization_id` and `optimization_id` on your query's output. **So a managed metric MUST surface those tenancy columns** — write `SELECT *` and map the columns, rather than projecting only `anonymous_id`/`timestamp`:
+
+```sql
+-- ✅ correct on the managed warehouse
+SELECT * FROM managed_dw.rewards
+WHERE name = 'signup_completed' AND timestamp_utc >= @start_date
+
+-- ❌ breaks at training time: "Name organization_id not found inside _levered_reward_scope"
+SELECT anonymous_id AS anonymous_id, timestamp_utc AS timestamp
+FROM managed_dw.rewards WHERE name = 'signup_completed'
+```
+
+Then map the real column names: `--anonymous-id-col anonymous_id --timestamp-col timestamp_utc` (and `--value-col value` for numeric rewards). The save-time dry-run now validates the wrapped query, so this mistake is rejected at `metrics create` instead of silently breaking `/results`.
+
+**Managed table schemas** (dataset `managed_dw`, BigQuery):
+
+`rewards` — one row per conversion event:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `anonymous_id` | STRING | join key to exposures |
+| `name` | STRING | metric name, e.g. `signup_completed` — filter on this |
+| `value` | FLOAT64 | numeric reward amount (defaults to 1) |
+| `timestamp_utc` | TIMESTAMP | event time; filter with `@start_date` |
+| `organization_id` | STRING | tenancy — surfaced by `SELECT *` |
+| `optimization_id` | STRING | nullable; NULL = global reward attributed by `name` |
+| `properties` | JSON | arbitrary metadata sent at ingestion |
+| `created_at` | TIMESTAMP | server-stamped write time |
+
+`exposures` — one row per served variant (rarely queried directly for metrics):
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `anonymous_id` | STRING | join key |
+| `variant` | JSON | served factor → value assignment |
+| `context` | JSON | context factors for this exposure |
+| `timestamp_utc` | TIMESTAMP | event time |
+| `organization_id` | STRING | tenancy |
+| `optimization_id` | STRING | which optimization |
+| `created_at` | TIMESTAMP | server-stamped write time |
+
+A **connected** (BYO) warehouse has no such wrapper — there you write whatever SQL your schema needs and `SELECT col AS anonymous_id, …` projection is fine. Check which the org is on with `levered warehouse status`.
 
 ## SDK Reference
 
