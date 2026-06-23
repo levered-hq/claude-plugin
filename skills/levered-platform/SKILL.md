@@ -106,7 +106,7 @@ When an org is on the managed warehouse, **exposures and rewards are written to 
 
 ### Authentication — API key
 
-Ingestion is authenticated with an **API key** (NOT the dashboard/Clerk session). Create one in the dashboard at **Settings > API Keys** — the secret is shown once. Send it as `Authorization: Bearer <api_key>` (or the `X-API-Key` header). When wiring code, read it from an env var (e.g. `LEVERED_API_KEY`).
+Ingestion is authenticated with an **API key** (NOT the dashboard/Clerk session). Create one in the dashboard at **Settings > API Keys** — the secret is shown once. Send it as `Authorization: Bearer <api_key>` (or the `X-API-Key` header). When wiring code, read it from an env var (e.g. `LEVERED_API_KEY`). Treat it as a **server-side write secret**: add it to a backend env / deployment secret, never a `NEXT_PUBLIC_`/`VITE_` client var or the browser bundle — send ingestion calls from the app's backend (or a proxy route), not directly from the client.
 
 ### Ingestion API
 

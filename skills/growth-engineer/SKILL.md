@@ -236,26 +236,37 @@ Now replace the local-override scaffolding with a real `useVariant` hook bound t
    </LeveredProvider>
    ```
 
-   **If the org is on the Managed Warehouse** (from step 6), don't log to a customer warehouse — POST the exposure to Levered's ingestion API instead, and send the reward at the conversion point. Both use the API key from an env var (e.g. `LEVERED_API_KEY`):
-   ```tsx
-   onExposure={(exposure) =>
-     fetch(`${LEVERED_API_URL}/api/v2/ingest/exposures`, {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-         Authorization: `Bearer ${process.env.LEVERED_API_KEY}`,
-       },
-       body: JSON.stringify({
-         events: [{
-           anonymous_id: exposure.anonymousId,
-           optimization_id: exposure.optimizationId,
-           variant: exposure.variant,
-         }],
-       }),
-     })
-   }
+   **If the org is on the Managed Warehouse** (from step 6), don't log to a customer warehouse — you must wire **both** halves: POST every **exposure** to Levered's ingestion API, and POST the **reward** at the conversion point. Miss either and the model can't learn — exposures with no rewards give no signal, rewards with no exposures have nothing to attribute to.
+
+   - **Prod ingestion URL:** `https://api.levered.dev/api/v2/ingest` (the `/exposures` and `/rewards` paths below). Drive the base from the same env-based `LEVERED_API_URL` as the provider so testing/local still work, but production ingestion must hit the prod host.
+   - **API key — create it and keep it server-side.** Have the user create a key in the dashboard at **Settings > API Keys** (https://app.levered.dev) — the secret is shown once. It's a **write secret**: add it as a server-side env var / deployment secret named `LEVERED_API_KEY`. Never expose it with a `NEXT_PUBLIC_` / `VITE_` prefix and never ship it in the client bundle. Because `onExposure` runs in the browser, point it at a small backend route in the user's app that holds the key and forwards the event to Levered — don't `fetch` Levered's ingestion API directly from the client with the key.
+
+   Exposure — from the backend route, on each exposure:
+   ```ts
+   await fetch('https://api.levered.dev/api/v2/ingest/exposures', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.LEVERED_API_KEY}` },
+     body: JSON.stringify({ events: [{
+       anonymous_id: exposure.anonymousId,
+       optimization_id: exposure.optimizationId,
+       variant: exposure.variant,
+     }] }),
+   });
    ```
-   At the conversion point, `POST /api/v2/ingest/rewards` with `{ events: [{ anonymous_id, name: '<reward-name>', value: 1 }] }`. See the Managed Warehouse section of the `levered-platform` skill for all fields and response codes.
+
+   Reward — from the backend, at the conversion point:
+   ```ts
+   await fetch('https://api.levered.dev/api/v2/ingest/rewards', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.LEVERED_API_KEY}` },
+     body: JSON.stringify({ events: [{
+       anonymous_id: anonymousId,   // SAME id sent on the exposure — the join key
+       name: '<reward-name>',       // the reward metric name
+       value: 1,                    // numeric amount; 1 = a conversion
+     }] }),
+   });
+   ```
+   See the Managed Warehouse section of the `levered-platform` skill for all fields and response codes (e.g. `409` = org not on the managed warehouse, `207` = partial accept, `403` = unknown/unauthorized `optimization_id`).
 
 2. **Swap `override` state for `useVariant`** in the target component:
    ```tsx
