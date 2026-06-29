@@ -59,14 +59,36 @@ levered warehouse columns <table>                                  # List column
 levered warehouse query --sql "SELECT ..."                         # Run SQL query
 levered warehouse preview --sql "SELECT ..."                       # Preview query results
 levered metrics list                                               # List metrics
-levered metrics create --name "..." --sql "SELECT ..." \
-  --anonymous-id-col anonymous_id --timestamp-col timestamp \
-  --reward-type bool                                               # Create boolean metric
-levered metrics create --name "..." --sql "SELECT ..." \
-  --anonymous-id-col anonymous_id --timestamp-col timestamp \
-  --value-col value --reward-type numeric                          # Create numeric metric
 levered metrics preview <id>                                       # Preview metric data
 ```
+
+**The three reward-metric types** (these mirror the dashboard's "How is this reward measured?" picker — keep the CLI and UI in sync):
+
+1. **Boolean** — every row the SQL returns counts as a reward of `1`; everyone else is the implicit failure (`0`). Use for conversions like signup.
+   ```
+   levered metrics create --name "Signups" --sql "SELECT ..." \
+     --anonymous-id-col anonymous_id --timestamp-col timestamp \
+     --reward-type bool
+   ```
+
+2. **Numeric** — a column holds each reward's amount (e.g. revenue). Requires `--value-col`.
+   ```
+   levered metrics create --name "Purchase Revenue" --sql "SELECT ..." \
+     --anonymous-id-col anonymous_id --timestamp-col timestamp \
+     --value-col amount --reward-type numeric
+   ```
+
+3. **Weighted outcomes** — 2+ mutually-exclusive outcomes, each with its own weight; a no-match exposure is the implicit `failure` bucket (weight 0). Pass `--outcomes` as a JSON array. Each outcome is `{"key","weight","match":{"by":"name"|"value","value":...}}`. The reward type stays `bool`.
+   - `match.by = "name"` matches the event-name column → also pass `--name-col <col>`.
+   - `match.by = "value"` matches the numeric value column → also pass `--value-col <col>`.
+   - `key` must be unique and **cannot** be `failure` (reserved for the no-match bucket).
+   ```
+   levered metrics create --name "Plan signups" --sql "SELECT ..." \
+     --anonymous-id-col anonymous_id --timestamp-col timestamp \
+     --reward-type bool --name-col event_name \
+     --outcomes '[{"key":"basic","weight":1,"match":{"by":"name","value":"signup_basic"}},
+                  {"key":"pro","weight":3,"match":{"by":"name","value":"signup_pro"}}]'
+   ```
 
 ### Serve
 ```
