@@ -57,10 +57,10 @@ levered optimizations list
 ```bash
 levered optimizations show <id>        # status, factors/levels, reward metric, dates
 levered optimizations results <id>     # three lift views (Measured/holdout, Best/ceiling, Policy/now), per-variant performance, factor importance — see section 2. Does NOT include guardrails.
-levered models state <model-id>        # posterior: per-variant expected_rewards (mean, std, p5–p95), exposures, rewards
+levered models state <model-id>        # per-variant posterior summary: exposures, observed reward, policy weight, predicted reward (mid + lo/hi credible interval)
 ```
 
-`results` is your primary source. `models state` gives you the full posterior — use it for credible intervals and to compute per-level effects yourself when needed (see "Understanding the model" below).
+`results` is your primary source. `models state` gives you the model's own per-variant summary — use it for credible intervals and to compute per-level effects yourself when needed (see "Understanding the model" below).
 
 ### 5. Report — use this exact four-section layout
 
@@ -80,13 +80,13 @@ Report the measured holdout lift as the result and the modeled Best as the ceili
 
 *Importance — a published metric, so use the platform's value.* Take it **straight from `results` (`factor_importance`)** — the same data the dashboard's Factor importance table renders. Present, per factor, the dashboard's columns: **Best level**, **Best-worst spread**, **Importance**. Do **not** recompute importance with your own posterior math. Add a one-line read of which factor carries the signal (e.g. "message dominates at 53%; auth button label is noise at 3%").
 
-*Cross effects — your own analysis, because the platform doesn't publish these.* Interactions between two design factors aren't a dashboard metric, so deriving them from the raw posterior is analysis, not reinvention. The per-variant `samples` from `models state` are **draw-aligned** (sample index `s` is the same posterior draw across every variant), so compute the interaction per draw and report a real credible interval — not a guess:
+*Cross effects — your own analysis, because the platform doesn't publish these.* Interactions between two design factors aren't a dashboard metric, so deriving them is analysis, not reinvention. `models state` exposes per-variant interval summaries (`pred_reward_lo/mid/hi`), not raw posterior draws, so compute the interaction from the per-variant point estimates (`pred_reward_mid`):
 
 ```
-interaction(A=a, B=b)_s = mean(variants with A=a,B=b)_s − mean(A=a)_s − mean(B=b)_s + grand_mean_s
+interaction(A=a, B=b) = mean(variants with A=a,B=b) − mean(A=a) − mean(B=b) + grand_mean
 ```
 
-Report only interactions whose interval clears zero, and **surface what they imply** — two factors that only pay off when aligned point to consolidating them into one coherent lever (feed this into section 6). Interactions are second-order and data-hungry: on a thin grid most are wide, so be conservative and lead with what the data supports. This is **design×design** only; **context×design** (personalization — "wins on mobile, loses on desktop") needs the context-aware model state that isn't shipped yet (#333).
+Without draw-aligned samples there is no honest credible interval for this quantity — treat it as a **screening signal, not a measured effect**: flag only interactions that are large relative to the factors' main-effect spreads, and say explicitly that it's a point estimate. **Surface what the flagged ones imply** — two factors that only pay off when aligned point to consolidating them into one coherent lever (feed this into section 6). Interactions are second-order and data-hungry: on a thin grid most are wide, so be conservative and lead with what the data supports. This is **design×design** only; **context×design** (personalization — "wins on mobile, loses on desktop") needs the context-aware model state that isn't shipped yet (#333).
 
 **4. Top variants.** A table of the top ~10 variants by performance, counted **per user** — a single user can be exposed many times, so per-user keeps this consistent with the holdout lift in section 2 (the #286 trap: never quote a per-exposure rate next to a per-user one):
 
@@ -128,15 +128,14 @@ Ground every call in real evidence — section 3's importance is the platform's,
 
 ## Understanding the model (so you read it correctly)
 
-Levered's bandit is a **Bayesian factorization machine** (`myfm`, a probit classifier) driven by **Thompson sampling**. Reading its output correctly matters:
+Levered's bandit is a **Bayesian factorization machine** driven by **Thompson sampling**. Reading its output correctly matters:
 
-- **Probit, not logistic.** Expected rewards come from the normal CDF (Φ), not a sigmoid. The platform already returns calibrated probabilities in `expected_rewards` — don't re-transform them.
-- **Posterior, not point estimate.** Each variant's `expected_rewards` carries `mean`, `std`, and percentiles (`p5`…`p95`). **Always carry the uncertainty into your read** — a 12% lift with a p5–p95 of [−3%, +27%] is not yet a winner. Thin exposures → wide intervals → "keep running."
+- **Posterior, not point estimate.** Each variant carries `expected_reward_mean` plus `expected_reward_lo`/`expected_reward_hi` — the bounds of its credible interval. **Always carry the uncertainty into your read** — a 12% lift with a lo–hi of [−3%, +27%] is not yet a winner. Thin exposures → wide intervals → "keep running."
 - **Baseline = all-first-level.** The reference variant is the index-0 level of every factor. Lift for any variant is `(p_variant − p_baseline) / p_baseline`. This is why the baseline level is never pruned — it's the measurement anchor.
 - **Allocation ≠ posterior mean.** Thompson sampling argmaxes posterior *draws*, so traffic weight follows the model's confidence, not the raw mean rate. A variant can lead on rate but still share traffic while the model is unsure.
-- **The FM models interactions.** A factor can matter only *in combination*. The platform doesn't publish an interaction metric, so derive **design×design** cross effects yourself from the raw draw-aligned posteriors (section 3) — that's analysis on raw data, not reinventing a dashboard number. Factor *importance*, by contrast, IS a published metric — use the platform's value, don't recompute it.
+- **The FM models interactions.** A factor can matter only *in combination*. The platform doesn't publish an interaction metric, so derive **design×design** cross effects yourself from the per-variant point estimates (section 3) — that's analysis on raw data, not reinventing a dashboard number. Factor *importance*, by contrast, IS a published metric — use the platform's value, don't recompute it.
 
-**Principle: present published metrics, analyze raw data.** Two rules, not one. (1) For anything the dashboard already shows — lift, factor importance, users, rates, expected rate, probability-of-best — use the value from `results`; don't re-derive it (your number will drift from the dashboard and confuse the user). (2) For insights the platform *doesn't* publish — cross effects, custom breakdowns, segment cuts — do the analysis yourself on raw data: the draw-aligned posteriors from `models state`, or `levered warehouse query`. That's the analyst's value-add. The line is simple: **never recompute a published number; always feel free to compute an unpublished one.**
+**Principle: present published metrics, analyze raw data.** Two rules, not one. (1) For anything the dashboard already shows — lift, factor importance, users, rates, expected rate, probability-of-best — use the value from `results`; don't re-derive it (your number will drift from the dashboard and confuse the user). (2) For insights the platform *doesn't* publish — cross effects, custom breakdowns, segment cuts — do the analysis yourself on raw data: the per-variant summaries from `models state`, or `levered warehouse query`. That's the analyst's value-add. The line is simple: **never recompute a published number; always feel free to compute an unpublished one.**
 
 For deeper concept references, see [concepts.md](../levered-platform/concepts.md) and [docs.levered.dev/docs/concepts/optimizations](https://docs.levered.dev/docs/concepts/optimizations).
 
