@@ -155,6 +155,14 @@ For React apps, the preview tool is `LeveredAdminMenu` from `@levered_dev/sdk/re
    const active = { ...FALLBACK, ...override }
    ```
 
+   Also initialize the override from a `levered_variant` URL query param (JSON of factor values). This makes every variant addressable by URL — which lets you screenshot variants headlessly (below) and lets the user deep-link a teammate to a specific combination:
+   ```tsx
+   useEffect(() => {
+     const raw = new URLSearchParams(window.location.search).get('levered_variant')
+     if (raw) try { setOverride({ ...FALLBACK, ...JSON.parse(raw) }) } catch {}
+   }, [])
+   ```
+
 3. **Render the admin menu** near the app root:
    ```tsx
    <LeveredAdminMenu
@@ -168,7 +176,9 @@ For React apps, the preview tool is `LeveredAdminMenu` from `@levered_dev/sdk/re
 
 4. **Branch the UI on `active.<factor>`** to implement each level. Structural/flow/layout factors may require new components or altered step sequences — that's expected, and why we do this before wire-up.
 
-5. **Guide the user to preview.** After you implement, tell them exactly how to try it:
+5. **Screenshot the variants for the user before asking them to click through.** With the dev server running, drive each variant headlessly via the `levered_variant` query param and show the user the images inline — reviewing a contact sheet of screenshots is much faster than manually toggling the admin menu, and it catches rendering problems (overflow, unreachable elements, broken layouts at the capture viewport) that a description can't. Use Playwright if available (`npx playwright screenshot`, or a small script that loops over the factor combinations, e.g. `page.goto(url + '?levered_variant=' + encodeURIComponent(JSON.stringify(combo)))` then `page.screenshot()`). Save these to a temp directory and show them inline — they're throwaway review artifacts; don't commit them to the user's repo. (Durable, dashboard-visible screenshots come later via `levered optimizations screenshot`, which uploads to Levered's storage — there's no optimization to attach them to yet during prototyping.) If no headless browser is available, skip this — don't block the flow on installing one.
+
+6. **Guide the user to preview interactively.** After showing the screenshots (or instead, if capture wasn't possible), tell them exactly how to try it live:
    - Which URL to open (the dev server the demo/app is running on).
    - Where the admin pill appears (usually bottom-right; labeled "Levered").
    - Which combinations are worth seeing first (e.g., "try `results_reveal = analyzing_plus_projection` with `plan_price_framing = anchored_price` — that's the boldest cell").
@@ -289,13 +299,29 @@ For non-React apps, use `LeveredClient` directly instead of the hook.
 
 Docs: [Integrate the SDK](https://docs.levered.dev/docs/getting-started/integrate-sdk).
 
-### 9. Summarize
+### 9. Capture variant screenshots
+
+With the dev server still running and `useVariant` wired up, capture a screenshot of every variant so the dashboard can preview them:
+
+```bash
+levered optimizations screenshot <optimization-id> --url <dev URL of the optimized page>
+```
+
+- Add `--selector '<css selector>'` for the optimized element's container when the page loads content dynamically, and `--full-page` when the optimized element is below the fold.
+- The command drives a headless Chromium against the dev app: for each variant it **intercepts the SDK's serve call in the browser and fulfills it locally** with that variant's factor values, screenshots the page, and uploads the PNG to Levered's storage (GCS) — the dashboard serves previews from there. The first run downloads Chromium (~130MB one-time; needs Node.js on PATH).
+- The interception is the load-bearing design, not an implementation detail: it makes captures **deterministic** (every variant renders on demand instead of reloading until the bandit happens to deal it) and **side-effect-free on Levered's side** (the serve request never reaches the API, so no serve events are written and training numbers are untouched). Never screenshot variants by hammering the real serve endpoint; if you ever need a real serve call for a spot-check, pass `dry_run: true` so it skips serve-event writes and auto-train.
+- The intercepted serves still trigger the app's own exposure logging — against the local dev server this lands in dev analytics, which is expected.
+- Don't save screenshots into the user's repo — the command uploads to Levered and cleans up its temp files; `--out-dir` exists for debugging only.
+- If capture fails (dev server down, browser install blocked), report it briefly and continue — screenshots are a nice-to-have, not load-bearing. They can be re-captured any time by re-running the command. If the installed CLI doesn't have the `screenshot` subcommand yet, tell the user to update the CLI rather than hand-rolling a capture script.
+
+### 10. Summarize
 
 Tell the user what you did in 3-4 sentences:
 - What optimization was created (name + ID)
 - What design factors and levels you chose
 - Where in their code the SDK was integrated
 - How exposure logging was set up
+- That variant screenshots are visible on the optimization's results page in the dashboard
 - What they need to do next (deploy, and rewards will start flowing)
 - Link to relevant docs for further reading (e.g., [Getting Started](https://docs.levered.dev/docs/getting-started))
 
