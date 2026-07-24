@@ -28,6 +28,8 @@ levered login                            # Authenticate (opens browser — user 
 levered optimizations list                                 # List all optimizations
 levered optimizations show <id>                            # Show optimization details
 levered optimizations results <id>                         # Get results: lift, variants, factor importance
+levered optimizations progress <id>                        # Days running, enrollment per arm, progress-to-best/convergence
+levered optimizations guardrails <id>                      # Guardrail metrics: bandit vs. holdout, lift, ok/violated status
 levered optimizations create \
   --name "..." \
   --design-factors '[{"name":"headline","levels":["Fast","Reliable","Simple"]}]' \
