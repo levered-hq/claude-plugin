@@ -301,18 +301,33 @@ Docs: [Integrate the SDK](https://docs.levered.dev/docs/getting-started/integrat
 
 ### 9. Capture variant screenshots
 
-With the dev server still running and `useVariant` wired up, capture a screenshot of every variant so the dashboard can preview them:
+**First, confirm the two prerequisites — don't just run the command and let it fail. Ask the user whatever you can't determine yourself:**
+
+1. **Is the dev server running?** You need a live local app to screenshot. Check for a running dev server (e.g. the process/port the app uses, or the URL from the prototype step). If it isn't up, ask the user to start it — or offer to start it yourself with the project's run command — and wait until it's actually serving before continuing. Never guess that it's up.
+2. **What is the URL of the optimized page?** This is the page where `useVariant` renders — often the one you previewed in the prototype step. If you already know it from earlier in this session, reuse it. If you don't, **ask the user for the exact URL** (e.g. `http://localhost:3000/signup`); don't assume `localhost:3000` or a route. If the app uses a non-default port, get it from the user or the dev-server output.
+
+Once both are confirmed, capture a screenshot of every variant so the dashboard can preview them. The CLI captures a small **sample first** and stops so you can verify it before committing to the full run:
 
 ```bash
-levered optimizations screenshot <optimization-id> --url <dev URL of the optimized page>
+# 1. Sample: captures the first 1-2 variants and stops.
+levered optimizations screenshot <optimization-id> --url <dev URL of the optimized page> --device desktop
+# 2. Inspect the sample PNGs it prints. Once they look right (variants differ,
+#    layout intact), re-run with --yes to capture and upload every variant:
+levered optimizations screenshot <optimization-id> --url <dev URL of the optimized page> --device desktop --yes
 ```
 
+- **`--device desktop|mobile`** (default `desktop`) picks a predefined viewport — `mobile` is an iPhone-15-Plus-class profile with touch/DPR, so responsive layouts render correctly. Prefer these presets over hand-setting `--viewport`. Capture `mobile` too when the app has a distinct mobile layout worth previewing.
+- **Always inspect the sample before `--yes`.** Open the sample PNGs the CLI prints and confirm the variant is actually applied — the variants should look different and match their factors. Only then re-run with `--yes`. Don't skip straight to `--yes` on a fresh wire-up.
 - Add `--selector '<css selector>'` for the optimized element's container when the page loads content dynamically, and `--full-page` when the optimized element is below the fold.
 - The command drives a headless Chromium against the dev app: for each variant it **intercepts the SDK's serve call in the browser and fulfills it locally** with that variant's factor values, screenshots the page, and uploads the PNG to Levered's storage (GCS) — the dashboard serves previews from there. The first run downloads Chromium (~130MB one-time; needs Node.js on PATH).
 - The interception is the load-bearing design, not an implementation detail: it makes captures **deterministic** (every variant renders on demand instead of reloading until the bandit happens to deal it) and **side-effect-free on Levered's side** (the serve request never reaches the API, so no serve events are written and training numbers are untouched). Never screenshot variants by hammering the real serve endpoint; if you ever need a real serve call for a spot-check, pass `dry_run: true` so it skips serve-event writes and auto-train.
 - The intercepted serves still trigger the app's own exposure logging — against the local dev server this lands in dev analytics, which is expected.
 - Don't save screenshots into the user's repo — the command uploads to Levered and cleans up its temp files; `--out-dir` exists for debugging only.
-- If capture fails (dev server down, browser install blocked), report it briefly and continue — screenshots are a nice-to-have, not load-bearing. They can be re-captured any time by re-running the command. If the installed CLI doesn't have the `screenshot` subcommand yet, tell the user to update the CLI rather than hand-rolling a capture script.
+- The CLI checks the dev server is reachable first and **self-heals timing** (waits for the app to serve, reloads once, reshoots slow re-renders) — you don't need to hand-tune waits. **Act on the failure it reports; don't just relay it:**
+  - *"SDK likely not installed / initialized"* or *"not applying the served variant props"* → the app isn't overriding variants. Fix it in the app code (initialize the SDK for this optimization, enable variant overriding), then re-run. This is a code fix — do it yourself.
+  - *"requested these optimization(s) instead"* → the app is wired to a **different** optimization than the one you're capturing. STOP and ask the user which optimization to capture; don't guess.
+  - *"dev server does not seem to be running"* → start the app at the correct URL/port, then re-run.
+- If capture still can't succeed (e.g. browser install blocked), report it briefly and continue — screenshots are a nice-to-have, not load-bearing, and can be re-captured any time. If the installed CLI doesn't have `--device`/`--yes` or the `screenshot` subcommand, tell the user to update the CLI rather than hand-rolling a capture script.
 
 ### 10. Summarize
 
