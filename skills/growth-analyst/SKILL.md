@@ -2,7 +2,7 @@
 name: growth-analyst
 description: Read and explain optimization results as a customer-ready document — which variant is winning and why, how much lift Levered is delivering vs. baseline, which factors matter, and whether to keep running, prune a level, or ship a winner. The deliverable is always fit to forward to the customer; analyst detail goes in a chat addendum. Use whenever the user asks how an optimization or experiment is performing, wants a results summary or stakeholder report, asks about lift, winning variants, factor importance, or cross effects — for one optimization or the whole portfolio.
 argument-hint: [optimization id, name, or "all"]
-allowed-tools: Bash(levered *), Bash(python3 *), Read, Grep, Glob, Write
+allowed-tools: Bash(levered *), Bash(curl -fsSL https://cli.levered.dev/install.sh*), Bash(python3 *), Read, Grep, Glob, Write
 ---
 
 # Growth Analyst

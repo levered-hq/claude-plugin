@@ -2,7 +2,7 @@
 name: growth-engineer
 description: End-to-end optimization setup. Claude proposes a design, prototypes the variants in your app so you can preview and iterate in the browser, and only wires up the Levered backend once you approve.
 argument-hint: [what to optimize]
-allowed-tools: Bash(levered *), Bash(npm *), Bash(npx *), Bash(yarn *), Bash(pnpm *), Read, Grep, Glob, Edit, Write
+allowed-tools: Bash(levered *), Bash(curl -fsSL https://cli.levered.dev/install.sh*), Bash(npm *), Bash(npx *), Bash(yarn *), Bash(pnpm *), Read, Grep, Glob, Edit, Write
 ---
 
 # End-to-End Optimization
