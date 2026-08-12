@@ -44,6 +44,29 @@ Read the user's codebase. Find the component, page, or feature they want to opti
 - The existing analytics/tracking (how conversions are measured)
 - The tech stack (React? Next.js? Vanilla? Server-rendered?)
 
+**Consult the org's knowledge base — best effort.** The org may have connected analytics (PostHog, Mixpanel), synced Notion pages, or uploaded research, brand, and pricing documents. Each one carries a short, optimization-oriented guidance summary. This is the difference between guessing at what to test and knowing where users actually drop off, so check it before drafting factors:
+
+```bash
+levered knowledge list --json
+```
+
+Run it silently and **do not let it block you**. Auth is deferred to step 6, so this can fail with an auth error on a fresh machine — if it fails for any reason, skip it, say nothing, and continue from the codebase alone. A knowledge base is an advantage when present, never a prerequisite.
+
+Read the JSON, and consider only documents with `use_as_knowledge: true` — anything else is opted out and must be ignored. Each entry carries a `source` (`posthog`, `mixpanel`, `notion`, `upload`) and a `summary`. A `summary` of `null` means the background summarizer hasn't finished, not that the document is empty. When a summary looks relevant, pull the full text:
+
+```bash
+levered knowledge view <document-id>
+```
+
+Be selective — these documents can be long. Read the summaries first, then fetch full content only for the two or three that actually bear on this optimization. Uploaded PDFs are skipped by the bulk `levered knowledge view` (binary content); fetch those by ID.
+
+Use what you find in two distinct ways:
+
+- **Analytics sources (`posthog`, `mixpanel`) → what to optimize.** These reports name the real funnels, drop-off points, and trafficked surfaces. Prefer a surface with genuine traffic and a measured leak over one that merely looks improvable in the code. If the user's brief is vague about *where* to optimize, this is the strongest evidence you have.
+- **Research, brand, and pricing docs (`notion`, `upload`) → factors and levels.** These tell you what's actually true about the product: real prices, real guarantees, real customer language, positioning constraints. Use them to ground level copy in claims the business can stand behind.
+
+Knowledge does not override the user. It informs your proposal; the user still confirms the reward and approves the design.
+
 **Reward first — always.** Factors only make sense in the context of a specific goal metric. "Optimize for trial started" implies very different variants than "optimize for D7 retention" or "optimize for revenue per user." So before drafting any factor table:
 
 - If the user's brief already names a clear goal ("optimize the trial conversion rate", "maximize daily active users"), take that as the reward and continue.
@@ -82,6 +105,8 @@ Once the reward is locked:
 
   Every invented element makes the variant un-shippable — if it wins, the business still can't deploy it. If you don't know whether something is real, **stop and ask the user**. Don't assume and don't fabricate plausible-looking placeholders. Reframing, re-ordering, or showing/hiding real content is fine; inventing new assertions is not.
 
+  **The knowledge base counts as real.** A fact documented in an opted-in knowledge document — a price, a guarantee, a review count, a customer quote — is established, not invented, and you may build a level on it. The rule cuts the other way too: a document that *contradicts* a claim puts it off-limits, even if it would otherwise be a plausible thing to test. When a level rests on a knowledge document rather than on the app's own code, say which document in the step-3 proposal so the user can check it.
+
   When you present the plan, briefly explain *why* you chose these factors — the hypothesis about why they'll move the metric.
 
 ### 3. Propose the design
@@ -89,6 +114,8 @@ Once the reward is locked:
 Before creating anything or touching code, present the proposed reward, factors, and hypothesis in a short message. Keep it to one short paragraph plus a factor table — not a menu of alternatives to pick from, but a concrete plan the user can approve or redirect. End with a single closing question like "Want me to prototype these in the app so you can click through them?"
 
 **Factor table format.** Use a markdown table with two columns: `Factor` and `Levels`. Render each level on **its own row** inside the Levels cell (use `<br>` to break lines). Never inline levels with " · " separators on a single line, and never prefix them with `L1:` / `L2:` / `L3:` — the position in the list already conveys order, and inline forms are hard to scan.
+
+**Cite the evidence, briefly.** If the knowledge base shaped the design, name the source inline in the hypothesis — "PostHog shows 62% drop off at the plan step" or "per the pricing doc, the 14-day trial is real." One clause, not a section, and only where it genuinely drove a choice. Evidence the user can trace is what separates a proposal they can trust from one they have to take on faith. If you worked from the codebase alone, say nothing about it.
 
 **Don't narrate the rules you're following.** Present factors, levels, and the *positive* hypothesis for why they'll move the metric. Then stop. Do **not** add trailing lines like "no invented content / no fabricated stats" or "excluding colors since they don't move the metric" — these read as defensive and waste the user's attention on the obvious. Just follow the rule; don't announce that you're following it. If the user later asks why something is missing, explain then.
 
@@ -205,6 +232,7 @@ levered metrics list
 ```
 
 - If not authenticated, tell the user to run `levered login` (requires a browser) and stop.
+- **If the knowledge-base check in step 2 failed on auth, retry it now** (`levered knowledge list --json`). If it turns up something that contradicts the approved design — a price that isn't real, a funnel that says the leak is elsewhere — raise it with the user before creating anything. It is far cheaper to change the design here than after the optimization is live.
 - If not on the right environment, switch with `levered env use <prod|testing>` based on what the app's `apiUrl` points at.
 - If no warehouse connected, tell the user to set one up in the Levered dashboard (https://app.levered.dev — Settings > Warehouse). The quickest option is the **Managed Warehouse** ("Hosted by Levered") — Levered hosts it and you send events to the ingestion API, with no warehouse to connect. Stop until they complete it.
 - **Note which warehouse the org is on.** If it's the **Managed Warehouse**, exposures and rewards are sent to Levered's ingestion API with an API key (not logged into a customer warehouse) — this changes how you wire tracking in step 8. See the Managed Warehouse section of the `levered-platform` skill for the endpoints + fields, and have the user create an API key at **Settings > API Keys**.
