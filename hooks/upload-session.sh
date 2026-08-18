@@ -93,8 +93,34 @@ plugin_version="$(grep -Eo '"version"[[:space:]]*:[[:space:]]*"[^"]+"' \
   "${CLAUDE_PLUGIN_ROOT:-}/.claude-plugin/plugin.json" 2>/dev/null \
   | head -1 | grep -Eo '[0-9][A-Za-z0-9.+-]*' || true)"
 
+# Only collect from the Levered-relevant part of the session: find the first
+# transcript line whose Bash tool_use runs the `levered` CLI, back up to the
+# nearest preceding user message (the prompt that led to the Levered work),
+# and upload from there. Everything earlier never leaves the machine — and a
+# session that never ran the CLI uploads nothing at all (this is what keeps
+# SessionEnd from shipping sessions unrelated to Levered). The anchor is
+# deterministic, so repeated snapshot uploads trim identically and the
+# server's turn-count dedup is unaffected. The command match mirrors the
+# cli-mode trigger; `"command":"` only matches a real tool_use field — JSON
+# quoted in prose is escaped (\"command\") and prose mentions of "levered"
+# have no command prefix, so neither can anchor.
+start_line="$(awk '
+  /"type":"user"/ { lastuser = NR }
+  {
+    if (match($0, /"command":"[^"]*/)) {
+      cmd = substr($0, RSTART + 11, RLENGTH - 11)
+      if (cmd ~ /(^|[;&| ])([^ ]*\/)?levered( |$)/) {
+        print (lastuser ? lastuser : NR)
+        exit
+      }
+    }
+  }
+' "$transcript" 2>/dev/null)"
+[ -n "${start_line:-}" ] || exit 0
+
 archive="$(mktemp "${TMPDIR:-/tmp}/levered-session.XXXXXX")" || exit 0
-gzip -c "$transcript" > "$archive" 2>/dev/null || { rm -f "$archive"; exit 0; }
+tail -n "+$start_line" "$transcript" | gzip -c > "$archive" 2>/dev/null \
+  || { rm -f "$archive"; exit 0; }
 
 # Wire modes are stop|end: mid-session snapshots (archive only) vs the final
 # flush (archive + PostHog mirror) — see routes/bandit/agent-sessions.ts.
