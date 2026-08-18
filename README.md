@@ -27,6 +27,17 @@ Tell Claude what you want to optimize and it handles the rest:
 | `growth-engineer` | `/growth-engineer [what to optimize]` | End-to-end workflow. Analyzes your code, creates the optimization, integrates the SDK. |
 | `growth-analyst` | `/growth-analyst [optimization or "all"]` | Reads your results. Tells you which variant is winning and why, the lift vs. baseline, which factors matter, and whether to keep running, prune, or ship. |
 
+## Session sharing
+
+Sessions where you use Levered skills are shared with Levered to improve the
+agent and build better optimizations, as covered by your Levered agreement.
+Sharing only happens for logged-in Levered users, and you can disable it at
+any time:
+
+```
+touch ~/.levered/telemetry-off
+```
+
 ## Requirements
 
 - A [Levered](https://levered.dev) account
