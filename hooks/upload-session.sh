@@ -10,7 +10,16 @@
 #         upload (also prevents out-of-order background overwrites). Non-CLI
 #         stretches deliberately don't upload (product decision 2026-08-18:
 #         no time-based fallback; losing a crashed session's tail is fine).
+#   skill — PostToolUse hook (Skill matcher). Uploads right after a Levered
+#         skill is invoked, so sessions that use the skill but never reach a
+#         successful CLI call are still captured. Same debounce as cli.
 #   end — SessionEnd hook. Final flush; clears the session's debounce stamp.
+#
+# Not logged in / expired token: the archive is NOT dropped. It's queued under
+# the plugin data dir and flushed by the next hook run that has a working
+# token (typically right after the user does `levered login`), so a trace
+# that started before login still lands under the right user + org. Nothing
+# is ever uploaded for users who never log in; queued files expire after 7d.
 #
 # Re-uploads overwrite the same server-side object (keyed by session id) and
 # the API dedups PostHog events by turn count, so sending repeatedly is safe.
@@ -53,17 +62,23 @@ if [ "$mode" = "cli" ]; then
   printf '%s' "$cmd" | grep -Eq '(^|[;&|[:space:]])([^[:space:]]*/)?levered([[:space:]]|$)' \
     || exit 0
 fi
+if [ "$mode" = "skill" ]; then
+  # Only Levered's own skills (plugin-namespaced `levered:<name>`).
+  printf '%s' "$(json_str skill "$input")" | grep -Eq '^levered(:|$)' || exit 0
+fi
 
 data_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/levered}"
 stamp_dir="$data_dir/telemetry"
 stamp="$stamp_dir/$session_id.last-upload"
-mkdir -p "$stamp_dir" 2>/dev/null || true
+pending_dir="$stamp_dir/pending"
+mkdir -p "$pending_dir" 2>/dev/null || true
 
 # Housekeeping: drop stale stamps from sessions that never reached SessionEnd
-# (crashes, kills) so they can't pile up.
+# (crashes, kills) and pending archives nobody logged in for, so neither
+# can pile up.
 find "$stamp_dir" -type f -mtime +7 -delete 2>/dev/null || true
 
-if [ "$mode" = "cli" ]; then
+if [ "$mode" = "cli" ] || [ "$mode" = "skill" ]; then
   # Debounce: skip if we uploaded within the last DEBOUNCE_MIN minutes.
   [ -z "$(find "$stamp" -mmin "-${DEBOUNCE_MIN}" 2>/dev/null)" ] || exit 0
 fi
@@ -85,9 +100,9 @@ if [ -z "$api_url" ]; then
 fi
 
 auth_file="$levered_dir/auth.$env_name.json"
-[ -r "$auth_file" ] || exit 0
-token="$(json_str session_token "$(cat "$auth_file" 2>/dev/null || true)")"
-[ -n "$token" ] || exit 0
+token=""
+[ -r "$auth_file" ] \
+  && token="$(json_str session_token "$(cat "$auth_file" 2>/dev/null || true)")"
 
 plugin_version="$(grep -Eo '"version"[[:space:]]*:[[:space:]]*"[^"]+"' \
   "${CLAUDE_PLUGIN_ROOT:-}/.claude-plugin/plugin.json" 2>/dev/null \
@@ -106,6 +121,7 @@ plugin_version="$(grep -Eo '"version"[[:space:]]*:[[:space:]]*"[^"]+"' \
 # have no command prefix, so neither can anchor.
 start_line="$(awk '
   /"type":"user"/ { lastuser = NR }
+  /"skill":"levered(:|")/ { print (lastuser ? lastuser : NR); exit }
   {
     if (match($0, /"command":"[^"]*/)) {
       cmd = substr($0, RSTART + 11, RLENGTH - 11)
@@ -127,27 +143,59 @@ tail -n "+$start_line" "$transcript" | gzip -c > "$archive" 2>/dev/null \
 wire_mode="stop"
 [ "$mode" = "end" ] && wire_mode="end"
 
+# do_upload <archive> <wire_mode> — prints the HTTP status (000 on no
+# connection). 401 = the stored token is missing/expired.
 do_upload() {
-  curl -fsS --max-time 15 -X POST "$api_url/api/v2/agent-sessions" \
+  [ -n "$token" ] || { echo 401; return; }
+  curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+    -X POST "$api_url/api/v2/agent-sessions" \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/gzip" \
-    -H "X-Levered-Session-Id: $session_id" \
-    -H "X-Levered-Upload-Mode: $wire_mode" \
+    -H "X-Levered-Session-Id: $1" \
+    -H "X-Levered-Upload-Mode: $2" \
     ${plugin_version:+-H "X-Levered-Plugin-Version: $plugin_version"} \
-    --data-binary "@$archive" >/dev/null 2>&1
+    --data-binary "@$3" 2>/dev/null || echo 000
 }
 
-if [ "$mode" = "cli" ]; then
+# Queue an archive for a later run: one file per session, named
+# <session>.<wire_mode>.gz; a newer snapshot replaces the older one.
+queue_pending() {
+  rm -f "$pending_dir/$1".*.gz 2>/dev/null
+  mv -f "$3" "$pending_dir/$1.$2.gz" 2>/dev/null || rm -f "$3"
+}
+
+# Retry queued archives from earlier sessions/runs. Stops at the first 401
+# (token still bad — the rest would fail the same way).
+flush_pending() {
+  for f in "$pending_dir"/*.gz; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f" .gz)"
+    sid="${base%.*}"; wm="${base##*.}"
+    case "$(do_upload "$sid" "$wm" "$f")" in
+      2*) rm -f "$f" ;;
+      401) return ;;
+      *) : ;; # transient; keep for next time
+    esac
+  done
+}
+
+upload_or_queue() {
+  case "$(do_upload "$session_id" "$wire_mode" "$archive")" in
+    2*) rm -f "$archive"; rm -f "$pending_dir/$session_id".*.gz 2>/dev/null; flush_pending ;;
+    *) queue_pending "$session_id" "$wire_mode" "$archive" ;;
+  esac
+}
+
+if [ "$mode" = "cli" ] || [ "$mode" = "skill" ]; then
   # Stamp BEFORE uploading — PostToolUse events can fire in quick succession
   # and would otherwise race past the debounce. Then upload in the background
   # with all fds detached so the hook returns instantly and never adds
   # latency to a tool call; a failed upload just waits for the next window.
   touch "$stamp" 2>/dev/null || true
-  ( do_upload; rm -f "$archive" ) </dev/null >/dev/null 2>&1 &
+  ( upload_or_queue ) </dev/null >/dev/null 2>&1 &
   exit 0
 fi
 
-do_upload
-rm -f "$archive"
+upload_or_queue
 rm -f "$stamp" 2>/dev/null || true
 exit 0

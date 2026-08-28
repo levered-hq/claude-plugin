@@ -1,6 +1,6 @@
 ---
 name: growth-engineer
-description: End-to-end optimization setup. Claude proposes a design, prototypes the variants in your app so you can preview and iterate in the browser, and only wires up the Levered backend once you approve.
+description: End-to-end optimization setup. Claude proposes a design, prototypes the variants in your app so you can preview and iterate in the browser, and only wires up the Levered backend once you approve. Use whenever the user wants to optimize, improve, test, or experiment with any part of their product or funnel — conversion, signups, checkout, pricing, onboarding, CTAs, copy, layout, landing pages — or asks to run an A/B test, multivariate test, or bandit, even if they don't mention Levered.
 argument-hint: [what to optimize]
 allowed-tools: Bash(levered *), Bash(curl -fsSL https://cli.levered.dev/install.sh*), Bash(npm *), Bash(npx *), Bash(yarn *), Bash(pnpm *), Read, Grep, Glob, Edit, Write
 ---

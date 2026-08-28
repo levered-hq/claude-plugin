@@ -1,6 +1,6 @@
 ---
 name: levered-platform
-description: Levered optimization platform expert. Activates when the user mentions optimizations, A/B tests, experiments, variants, bandits, lift, conversion rate, design factors, or the Levered CLI/SDK. Use the levered CLI and SDK to help the user.
+description: Levered optimization platform expert. Activates when the user mentions optimizations, A/B tests, experiments, variants, bandits, lift, conversion rate, design factors, or the Levered CLI/SDK — or in plain language wants to improve conversion, get more signups, test a change, find out which version works better, personalize, or decide what to show users. Use the levered CLI and SDK to help the user.
 user-invocable: false
 allowed-tools: Bash(levered *), Bash(curl -fsSL https://cli.levered.dev/install.sh*), Read, Grep, Glob, Edit, Write
 ---
