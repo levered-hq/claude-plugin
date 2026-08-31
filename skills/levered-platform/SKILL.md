@@ -21,6 +21,9 @@ levered whoami                           # Check current user
 levered env                              # Show current environment
 levered env use <prod|testing|local>     # Switch environment
 levered login                            # Authenticate (opens browser — user must do this)
+levered api-keys create --label my-app   # Create an ingestion API key (secret shown once; --key-only to pipe)
+levered api-keys list                    # List keys (prefixes only)
+levered api-keys revoke <id>             # Revoke a key
 ```
 
 ### Optimizations

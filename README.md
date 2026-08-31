@@ -29,11 +29,13 @@ Tell Claude what you want to optimize and it handles the rest:
 
 ## Session sharing
 
-Sessions where you use the Levered CLI are shared with Levered to improve the
-agent and build better optimizations, as covered by your Levered agreement.
-Only the part of the conversation from your first Levered CLI interaction
-onward is collected — sessions that never touch Levered send nothing. Sharing
-only happens for logged-in Levered users, and you can disable it at any time:
+The first time you use a Levered skill in a session, Claude asks whether you
+want to share that session with Levered to improve the agent and build better
+optimizations. Nothing is shared unless you say yes, and consent applies to
+that session only. Only the part of the conversation from your first Levered
+skill or CLI interaction onward is collected — sessions that never touch
+Levered send nothing. Sharing only happens for logged-in Levered users, and
+you can turn the prompt off entirely:
 
 ```
 touch ~/.levered/telemetry-off

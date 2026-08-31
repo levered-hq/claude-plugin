@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Upload the session transcript to Levered. Session sharing is on by default
-# for logged-in Levered users (disclosed in the customer agreement); disable it
-# any time with:  touch ~/.levered/telemetry-off
-# Runs in two modes ($1):
+# Upload the session transcript to Levered, if (and only if) the user opted in
+# this session: consent is a per-session marker file written by Claude when
+# the user says yes (see telemetry-consent.sh). No marker, no upload. A global
+# kill switch also exists:  touch ~/.levered/telemetry-off
+# Runs in three modes ($1):
 #
 #   cli — PostToolUse hook (Bash matcher). Uploads right after each `levered`
 #         CLI call — the moments Levered-relevant work just happened — with a
@@ -71,12 +72,19 @@ data_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/levered}"
 stamp_dir="$data_dir/telemetry"
 stamp="$stamp_dir/$session_id.last-upload"
 pending_dir="$stamp_dir/pending"
+consent_dir="$data_dir/telemetry-consent"
+marker="$consent_dir/$session_id"
 mkdir -p "$pending_dir" 2>/dev/null || true
+
+# Consent gate. Stale markers from sessions that never ended are purged with
+# the other housekeeping below. Queued archives only ever exist for sessions
+# that had consent when they were queued, so flushing them later is fine.
+[ -f "$marker" ] || exit 0
 
 # Housekeeping: drop stale stamps from sessions that never reached SessionEnd
 # (crashes, kills) and pending archives nobody logged in for, so neither
 # can pile up.
-find "$stamp_dir" -type f -mtime +7 -delete 2>/dev/null || true
+find "$stamp_dir" "$consent_dir" -type f -mtime +7 -delete 2>/dev/null || true
 
 if [ "$mode" = "cli" ] || [ "$mode" = "skill" ]; then
   # Debounce: skip if we uploaded within the last DEBOUNCE_MIN minutes.
@@ -135,7 +143,12 @@ start_line="$(awk '
 [ -n "${start_line:-}" ] || exit 0
 
 archive="$(mktemp "${TMPDIR:-/tmp}/levered-session.XXXXXX")" || exit 0
-tail -n "+$start_line" "$transcript" | gzip -c > "$archive" 2>/dev/null \
+# Scrub Levered ingestion-key secrets (lvk_<16hex>_<48hex>) before anything
+# leaves the machine — `levered api-keys create` output would otherwise put
+# the secret in the transcript. The prefix survives for identification.
+tail -n "+$start_line" "$transcript" \
+  | sed -E 's/(lvk_[0-9a-f]{16})_[0-9a-f]{48}/\1_REDACTED/g' \
+  | gzip -c > "$archive" 2>/dev/null \
   || { rm -f "$archive"; exit 0; }
 
 # Wire modes are stop|end: mid-session snapshots (archive only) vs the final
@@ -197,5 +210,6 @@ if [ "$mode" = "cli" ] || [ "$mode" = "skill" ]; then
 fi
 
 upload_or_queue
-rm -f "$stamp" 2>/dev/null || true
+# Consent never outlives the session.
+rm -f "$stamp" "$marker" 2>/dev/null || true
 exit 0
