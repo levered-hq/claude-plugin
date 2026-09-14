@@ -12,7 +12,7 @@ The user wants to optimize something. You own the whole flow. Be opinionated abo
 1. **Prototype phase** — propose the design, implement the variants in the user's code with a local preview (no Levered backend yet), and let the user click through every variant in the browser. Iterate on factors, levels, copy, and layout based on what they see. Stay here until the user explicitly says they're happy.
 2. **Wire-up phase** — only after approval, create the optimization in Levered, swap the local preview scaffolding for `useVariant`, and set up exposure logging.
 
-Creating the optimization in the backend and wiring `useVariant` too early wastes the user's time: once an optimization is live, changing factors or levels means archiving and recreating. The preview loop is where design decisions get made.
+Creating the optimization in the backend and wiring `useVariant` too early wastes the user's time: once an optimization is live, changing factors or levels means archiving and recreating (while it is still a draft, `levered optimizations update <id> --design-factors` can replace the design). The preview loop is where design decisions get made.
 
 ## Your Job
 
@@ -372,7 +372,7 @@ Don't dump CLI output. Don't over-explain. Be brief and confident.
 
 ## Important Rules
 
-- **Prototype first, wire up second.** Never call `levered optimizations create` or swap in `useVariant` before the user has seen the variants in the browser and explicitly approved them. The preview loop is where design decisions get made — once the optimization exists in the backend, changing factors means archiving and recreating.
+- **Prototype first, wire up second.** Never call `levered optimizations create` or swap in `useVariant` before the user has seen the variants in the browser and explicitly approved them. The preview loop is where design decisions get made — once the optimization exists in the backend, the design can only be replaced while it is still a draft (`levered optimizations update <id> --design-factors '<json>'`, which rebuilds the model); after it goes live, changing factors means archiving and recreating.
 - **"Wire this up" is ambiguous — resolve it.** If the user says "yes" or "wire it up" after you propose the design, interpret it as "build the prototype so I can preview it," not "create the optimization in Levered." When in doubt, say what you're about to do: "I'll build the variants locally with a preview pill — no Levered backend yet — so you can click through them."
 - **Aim for impact, not safety.** The goal is to move the reward metric as much as possible. Copy-only optimizations cap out at small single-digit lift; structural and flow changes can deliver much more.
 - **Be opinionated.** Pick the factors and levels yourself. The user wants a proposed plan, not a menu.

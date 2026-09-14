@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Upload the session transcript to Levered, if (and only if) the user opted in
-# this session: consent is a per-session marker file written by Claude when
-# the user says yes (see telemetry-consent.sh). No marker, no upload. A global
-# kill switch also exists:  touch ~/.levered/telemetry-off
+# at the account level: the dashboard asks once after sign-up, stores the
+# answer on the Clerk user, and `levered login` writes it into
+# ~/.levered/auth.<env>.json as "telemetry_consent": true|false. Absent or
+# false → no upload. A global kill switch also exists:
+#   touch ~/.levered/telemetry-off
 # Runs in three modes ($1):
 #
 #   cli — PostToolUse hook (Bash matcher). Uploads right after each `levered`
@@ -16,11 +18,10 @@
 #         successful CLI call are still captured. Same debounce as cli.
 #   end — SessionEnd hook. Final flush; clears the session's debounce stamp.
 #
-# Not logged in / expired token: the archive is NOT dropped. It's queued under
-# the plugin data dir and flushed by the next hook run that has a working
-# token (typically right after the user does `levered login`), so a trace
-# that started before login still lands under the right user + org. Nothing
-# is ever uploaded for users who never log in; queued files expire after 7d.
+# Expired token: the archive is NOT dropped. It's queued under the plugin data
+# dir and flushed by the next hook run that has a working token (typically
+# right after the user does `levered login`). Not logged in at all means no
+# consent on file, so nothing is captured or queued; queued files expire after 7d.
 #
 # Re-uploads overwrite the same server-side object (keyed by session id) and
 # the API dedups PostHog events by turn count, so sending repeatedly is safe.
@@ -72,19 +73,12 @@ data_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/levered}"
 stamp_dir="$data_dir/telemetry"
 stamp="$stamp_dir/$session_id.last-upload"
 pending_dir="$stamp_dir/pending"
-consent_dir="$data_dir/telemetry-consent"
-marker="$consent_dir/$session_id"
 mkdir -p "$pending_dir" 2>/dev/null || true
 
-# Consent gate. Stale markers from sessions that never ended are purged with
-# the other housekeeping below. Queued archives only ever exist for sessions
-# that had consent when they were queued, so flushing them later is fine.
-[ -f "$marker" ] || exit 0
-
 # Housekeeping: drop stale stamps from sessions that never reached SessionEnd
-# (crashes, kills) and pending archives nobody logged in for, so neither
+# (crashes, kills) and pending archives that never got flushed, so neither
 # can pile up.
-find "$stamp_dir" "$consent_dir" -type f -mtime +7 -delete 2>/dev/null || true
+find "$stamp_dir" -type f -mtime +7 -delete 2>/dev/null || true
 
 if [ "$mode" = "cli" ] || [ "$mode" = "skill" ]; then
   # Debounce: skip if we uploaded within the last DEBOUNCE_MIN minutes.
@@ -111,6 +105,12 @@ auth_file="$levered_dir/auth.$env_name.json"
 token=""
 [ -r "$auth_file" ] \
   && token="$(json_str session_token "$(cat "$auth_file" 2>/dev/null || true)")"
+
+# Consent gate: the account-level answer `levered login` stored alongside the
+# token. No file, no field, or false → nothing leaves the machine. Sits before
+# any queueing/flushing so pending archives only ever exist for a consenting
+# account.
+grep -Eq '"telemetry_consent"[[:space:]]*:[[:space:]]*true' "$auth_file" 2>/dev/null || exit 0
 
 plugin_version="$(grep -Eo '"version"[[:space:]]*:[[:space:]]*"[^"]+"' \
   "${CLAUDE_PLUGIN_ROOT:-}/.claude-plugin/plugin.json" 2>/dev/null \
@@ -210,6 +210,5 @@ if [ "$mode" = "cli" ] || [ "$mode" = "skill" ]; then
 fi
 
 upload_or_queue
-# Consent never outlives the session.
-rm -f "$stamp" "$marker" 2>/dev/null || true
+rm -f "$stamp" 2>/dev/null || true
 exit 0

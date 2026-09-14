@@ -43,9 +43,15 @@ levered optimizations create \
   --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
                                                            # Create optimization
 levered optimizations update <id> --status live            # Update optimization status
+levered optimizations update <id> \
+  --design-factors '[{"name":"headline","levels":["Fast","Reliable"]}]' \
+  --excluded-combinations '[...]'                          # Replace factors/levels — DRAFT ONLY (rebuilds the model; pass exclusions again, stored ones are dropped)
 levered optimizations archive <id> -y                      # Archive optimization (use -y to skip confirmation)
+levered optimizations delete <id> -y                       # Delete: drafts/never-served are removed for real; ARCHIVED ones are hidden with data retained; live ones must be archived first
 levered optimizations observations <id>                    # View observations/training data
 ```
+
+**Editing a design.** While an optimization is still a draft, `levered optimizations update <id> --design-factors '<json>'` replaces the whole design (send every factor, not just the changed one). Levels given as plain values get fresh ids; to keep an existing level's id, pass it as `{"id":"lv_...","value":"..."}` as returned by `show`. Once live, factors and levels are locked — archive and create a new optimization instead.
 
 **Variant space limit.** When creating an optimization, keep the total variant count (the product of all factor levels) **at or under 100**. The bandit needs enough exposures per variant to learn — beyond ~100 variants, traffic spreads too thin and convergence stalls. If a proposed design exceeds 100 (e.g. 5 factors × 3 levels = 243), drop or merge factors before calling `create`, and tell the user why.
 

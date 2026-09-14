@@ -29,13 +29,15 @@ Tell Claude what you want to optimize and it handles the rest:
 
 ## Session sharing
 
-The first time you use a Levered skill in a session, Claude asks whether you
-want to share that session with Levered to improve the agent and build better
-optimizations. Nothing is shared unless you say yes, and consent applies to
-that session only. Only the part of the conversation from your first Levered
-skill or CLI interaction onward is collected — sessions that never touch
-Levered send nothing. Sharing only happens for logged-in Levered users, and
-you can turn the prompt off entirely:
+When you first sign in to the Levered dashboard, it asks once whether you want
+to share your Claude Code sessions with Levered to improve the agent and build
+better optimizations. The answer is saved on your account and applies to every
+session on every machine — there is no per-session prompt. Nothing is shared
+unless you said yes, and `levered login` must have run after that (the choice
+travels with your login). Only the part of a conversation from your first
+Levered skill or CLI interaction onward is collected — sessions that never
+touch Levered send nothing. To stop sharing from one machine regardless of the
+account setting:
 
 ```
 touch ~/.levered/telemetry-off
