@@ -29,6 +29,19 @@ def fmt_pct(x, digits=2):
     return f"{'+' if x >= 0 else ''}{x * 100:.{digits}f}%"
 
 
+def level_values(factor):
+    """Factor levels as plain strings. The platform stores levels either as
+    strings or as {id, value, previous_values} objects; variants and the cube
+    carry the VALUE, so that is the canonical form throughout."""
+    out = []
+    for lv in factor.get("levels") or []:
+        if isinstance(lv, dict) and "value" in lv:
+            out.append(str(lv["value"]))
+        else:
+            out.append(str(lv))
+    return out
+
+
 def norm_cdf(z):
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
@@ -188,7 +201,7 @@ def main():
     if not weight_of:
         weight_of = {"__converted__": 1.0}
     config_fingerprint = {
-        "factors": [(f.get("name"), sorted(map(str, f.get("levels") or []))) for f in factors],
+        "factors": [(f.get("name"), sorted(level_values(f))) for f in factors],
         "outcomes": sorted((k, v) for k, v in weight_of.items()),
         "holdout": o.get("holdout_percentage"),
         "window": o.get("reward_conversion_window"),
@@ -200,8 +213,7 @@ def main():
     print("== CONFIG ==")
     print(f"name: {o.get('name')}   status: {o.get('status')}   id: {o.get('id')}")
     for f in factors:
-        levels = f.get("levels") or []
-        print(f"factor {f.get('name')}: {', '.join(map(str, levels))} (level 0 = baseline)")
+        print(f"factor {f.get('name')}: {', '.join(level_values(f))} (level 0 = baseline)")
     print(f"reward outcomes/weights: {weight_of}")
     print(f"conversion window: {o.get('reward_conversion_window')}   holdout: {o.get('holdout_percentage')}%")
     print(f"excluded combinations: {o.get('excluded_combinations')}")
@@ -395,7 +407,7 @@ def main():
     fnames = [f.get("name") for f in factors]
     if variants and fnames:
         for f in factors:
-            name, levels = f.get("name"), [str(x) for x in (f.get("levels") or [])]
+            name, levels = f.get("name"), level_values(f)
             means = {}
             for lv in levels:
                 vs = [v.get("expected_reward_mean") for v in variants if str((v.get("variant") or {}).get(name)) == lv]
@@ -415,8 +427,8 @@ def main():
         imp_sorted = sorted(results.get("factor_importance") or [], key=lambda x: -(x.get("mean") or 0))
         fa = imp_sorted[0]["factor"] if imp_sorted else fnames[0]
         fb = imp_sorted[1]["factor"] if len(imp_sorted) > 1 else fnames[1]
-        la = [str(x) for x in next((f.get("levels") for f in factors if f.get("name") == fa), [])]
-        lb = [str(x) for x in next((f.get("levels") for f in factors if f.get("name") == fb), [])]
+        la = next((level_values(f) for f in factors if f.get("name") == fa), [])
+        lb = next((level_values(f) for f in factors if f.get("name") == fb), [])
         cells = defaultdict(lambda: defaultdict(int))  # (day, a, b) -> outcome -> users
         for r in rows:
             if r["in_holdout"]:
