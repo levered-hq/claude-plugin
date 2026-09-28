@@ -17,6 +17,7 @@ The report below (sign-up screen, 6 August 2026) is a user-approved worked examp
 - **No all-variants appendix**: embedding every variant's snapshot in an appendix was tried and rejected (user ruling 2026-08-06, "too much"). The two body snapshots plus the optimization link are the report's entire visual footprint.
 - **Utilities table** grouped by factor (factor cell left empty on continuation rows), levels sorted descending within factor, original level marked `*(original)*` at 0, the winner's levels bold.
 - **Interactions**: bold inline lead, the LR stat quoted as χ² with df and p, then a *top-deviations* table (`Combination / vs. additive / n`, deviations as pp with z in parentheses, sub-2 z labeled `directional` inline), then the FULL masked deviation matrix as a compact markdown table (rows = one factor's levels, columns = the other's, cells = deviation in pp, masked cells as `·`). Close with the bulleted `**What the interactions show: <claim>.**` block.
+- **Context effects** (only when the model has context factors; last block of *What wins and why*): bold inline lead with the claim, one table per context factor (`Level / Users / Holdout / Optimized / Lift / 95% CI / Winner / Winner's traffic`), one sentence on whether lift differs between levels, then the bulleted `**What context added: <claim>.**` block: the model's finding first (labeled *model estimate*), then the empirical cross-check with its coverage, then the consequence. Lift per level is measured; what context added is model-led, and a null result reads "no benefit detected so far". The Summary's *What wins and why* bullet states the verdict in one clause, and Recommended action settles the context factors for the next optimization. The exemplar below includes the block for a model with one context factor.
 - **Charts — RETIRED (2026-08-03).** No SVG/image charts anywhere in the deliverable; evidence that would have been a chart is a compact markdown table or is dropped. The only images are the two variant snapshots.
 - **Recommended action**: bold opener stating whether a decision is needed now, then a short numbered list (three here), each item starting with a bold imperative phrase and carrying its condition inline (guardrail status, measurement consequence of path a vs. b).
 - **Method notes**: after a `---` break, ONE italic paragraph beginning `*Method notes: …*` — inline label, no headline, fine-print register. Essentials only, about three sentences (user ruling 2026-08-06): counting basis + windows, measurement start + why, table-comparability caveat; no methodology narration.
@@ -33,7 +34,7 @@ The report below (sign-up screen, 6 August 2026) is a user-approved worked examp
 
 - **Progress:** The model is fully converged at 100% progress-to-best and the winning variant has carried over 99% of optimized traffic since 22 July. 184,730 users are enrolled, and the lift direction has been consistent across all measurement windows.
 - **Impact:** Measured sign-up lift is **+1.4%** on the full measurement window and **+1.9%** since allocation converged, both statistically significant versus the randomized holdout. That translates to roughly **300 to 450 additional sign-ups per month** at current traffic. Intro completion is up +1.2%, at the threshold of significance; booking shows no detectable change.
-- **What wins and why:** The refund-estimate message is the strongest element in the test, and the winner pairs it with the progress bar and the *"Continue with"* button. The winner's advantage is element strength: it combines the best level of every factor.
+- **What wins and why:** The refund-estimate message is the strongest element in the test, and the winner pairs it with the progress bar and the *"Continue with"* button. The winner's advantage is element strength: it combines the best level of every factor. The same variant wins on both platforms, and no benefit from considering context has been detected.
 - **Recommended action:** Adopt the winner by leaving the optimization running, which requires no engineering and keeps the holdout measuring. Reinvest attention in a next optimization built on the learnings.
 
 ## Progress
@@ -149,13 +150,29 @@ The full deviation matrix (observed minus additive prediction, pp; cells with fe
 - The positive trust × shield cells are floor effects, two weak elements hurting less than predicted while still trailing the leaders. No design recommendation follows.
 - A new pairing therefore deserves validation on its own traffic.
 
+**Context effects.** The optimization considered one context factor, platform, and the result holds on both platforms. Measured against the randomized holdout within each level, per user (window: since 31 May):
+
+| Platform | Users | Holdout | Optimized | Lift | 95% CI | Winner | Winner's traffic |
+|---|---|---|---|---|---|---|---|
+| ios | 64% | 69.80% (n=10,160) | 70.85% (n=91,560) | +1.50% | [+0.41%, +2.59%] | variant 67 | 99.3% |
+| android | 36% | 64.63% (n=5,720) | 65.40% (n=51,500) | +1.19% | [−0.29%, +2.67%] | variant 67 | 98.7% |
+
+Sign-up rates are higher on iOS in both arms, and the lift shows no detectable difference between the platforms (heterogeneity test: Q = 0.11, df = 1, p = 0.74).
+
+**What context added: no personalization benefit has been detected.**
+
+- The model finds no platform effect on which variant wins (context importance 0.00, *model estimate*), and it serves variant 67 to 99% of traffic on both platforms.
+- The observed data agree: among the four variants with enough users on both platforms, the same one leads on each, and there is no evidence that any variant performs differently by platform (day-controlled test: F(3, 139,870) = 0.62, p = 0.60). This comparison is a cross-check and is not randomized.
+- An optimization without the platform factor would therefore most likely have reached the same design.
+- Considering a context factor slows learning, because the model has to learn each level separately. Platform can be left out of the next optimization.
+
 ## Recommended action
 
 **A decision is available now: the winner is confirmed and can be adopted.** The measured lift is statistically significant, guardrails are clear, and the system has already routed essentially all optimized traffic to the winner.
 
 1. **Adopt the winner by leaving the optimization running.** Path (a) keeps serving through the platform: the winner already receives 99.1% of optimized traffic, no engineering is required, and the 10% holdout continues to measure the lift. Path (b) hard-codes the variant in the app and ends the optimization, which also ends measurement. Path (a) is preferable until the next optimization is ready to use this traffic. Guardrail status at adoption: intro completion positive, booking no detectable change.
 2. **Keep the configuration unchanged while the optimization runs.** The measurement window restarts whenever the configuration changes, and the current window is what carries the statistical confirmation.
-3. **Reinvest the traffic in a next optimization built on the learnings:** lead with the refund estimate, keep it paired with its progress cue as one unit, prefer no visual when the message carries the value on its own, and skip decorative illustrations, which cost 0.8 to 1.1pp wherever they appeared.
+3. **Reinvest the traffic in a next optimization built on the learnings:** lead with the refund estimate, keep it paired with its progress cue as one unit, prefer no visual when the message carries the value on its own, and skip decorative illustrations, which cost 0.8 to 1.1pp wherever they appeared. Leave platform out as a context factor, since no benefit was detected here and the next optimization learns faster without it.
 
 ---
 

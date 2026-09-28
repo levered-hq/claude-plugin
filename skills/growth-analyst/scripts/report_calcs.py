@@ -11,7 +11,9 @@ VALIDATION (holdout share by day, enrollment reconciliation, baseline-sanity
 gate), MEASURED (published + windowed recomputes on the same estimand),
 GUARDRAILS, MODELED, VARIANTS, OUTCOME MIX (with monthly translation),
 FACTOR UTILITIES, INTERACTIONS (day-controlled F-test + full deviation
-matrix). Every derived figure is labeled with its basis so the report writer
+matrix), CONTEXT (measured lift per context level, winner per level, and the
+value personalization added over the single best variant; printed only when
+the model has context factors). Every derived figure is labeled with its basis so the report writer
 never has to re-derive one with ad hoc warehouse SQL.
 """
 
@@ -168,6 +170,202 @@ def mean_sd_from_sums(n, vsum, vsumsq):
     mean = vsum / n
     var = max(0.0, (vsumsq - vsum * vsum / n) / (n - 1)) if n > 1 else 0.0
     return mean, math.sqrt(var)
+
+
+def counts_stats(counts, value_of):
+    """(n, mean, variance) of the per-user value for outcome -> users counts."""
+    n = sum(counts.values())
+    if n == 0:
+        return 0, 0.0, 0.0
+    mean = sum(c * value_of(k) for k, c in counts.items()) / n
+    var = sum(c * (value_of(k) - mean) ** 2 for k, c in counts.items()) / (n - 1) if n > 1 else 0.0
+    return n, mean, var
+
+
+def variant_label(raw):
+    try:
+        v = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return str(raw)
+    if not isinstance(v, dict):
+        return str(raw)
+    return " · ".join(str(v[k]) for k in sorted(v))
+
+
+# A variant needs this many users inside a context level before it can be
+# named that level's winner; below it the mean is noise.
+MIN_CELL_USERS = 200
+
+
+def context_section(rows, context_factors, results, value_of, since):
+    """Everything the report's Context block needs, per context factor:
+    measured lift by level, the winner by level, the variant × context test,
+    and the value of personalizing over serving the single best variant."""
+    print("\n== CONTEXT (cube basis; context = value at first exposure) ==")
+    for imp in results.get("context_importance") or []:
+        print(
+            f"model context importance {imp.get('factor')}: mean {imp.get('mean') or 0:.3f} "
+            f"(lo {imp.get('lo') or 0:.3f}, hi {imp.get('hi') or 0:.3f})  [model estimate]"
+        )
+
+    for cf in context_factors:
+        levels = sorted({(r.get("context") or {}).get(cf, "") for r in rows})
+        print(f"\n-- context factor: {cf}  (levels: {', '.join(lv or '(missing)' for lv in levels)}) --")
+        if len(levels) < 2:
+            print("only one level observed: nothing to compare")
+            continue
+
+        def level_of(r):
+            return (r.get("context") or {}).get(cf, "")
+
+        # 1. Measured lift per level (randomized within level: holdout is assigned by user hash).
+        for label, day_min in (("full window", None), (f"since {since}", since)):
+            if label != "full window" and not day_min:
+                continue
+            arms = defaultdict(lambda: defaultdict(int))  # (level, arm) -> outcome -> users
+            for r in rows:
+                if day_min and r["day"] < day_min:
+                    continue
+                arms[(level_of(r), "holdout" if r["in_holdout"] else "optimized")][r["outcome_key"]] += r["users"]
+            total_opt = sum(sum(c.values()) for (lv, arm), c in arms.items() if arm == "optimized")
+            print(f"[{label}] measured lift by level:")
+            lifts = []
+            for lv in levels:
+                hn, hm, hv = counts_stats(arms[(lv, "holdout")], value_of)
+                on, om, ov = counts_stats(arms[(lv, "optimized")], value_of)
+                res = lift_with_ci(hn, hm, math.sqrt(hv), on, om, math.sqrt(ov))
+                share = on / total_opt if total_opt else 0.0
+                if not res or res[1] is None:
+                    print(f"  {lv or '(missing)':<22} share {share * 100:4.1f}%  holdout n={hn}  optimized n={on}  (too few users for a lift)")
+                    continue
+                lift, lo, hi, pval = res
+                lifts.append((lift, (hi - lo) / (2 * 1.96)))
+                print(
+                    f"  {lv or '(missing)':<22} share {share * 100:4.1f}%  holdout {hm:.4g} (n={hn})  optimized {om:.4g} (n={on})  "
+                    f"lift {fmt_pct(lift)} [{fmt_pct(lo)}, {fmt_pct(hi)}] p={pval:.3g}"
+                )
+            if len(lifts) >= 2 and all(se > 0 for _, se in lifts):
+                w = [1 / se**2 for _, se in lifts]
+                pooled = sum(wi * li for wi, (li, _) in zip(w, lifts)) / sum(w)
+                q = sum(wi * (li - pooled) ** 2 for wi, (li, _) in zip(w, lifts))
+                df = len(lifts) - 1
+                # chi-square(df) tail as the large-denominator limit of F.
+                p_het = f_sf(q / df, df, 1e9)
+                print(
+                    f"  lift heterogeneity across levels: Q({df}) = {q:.2f}, p = {p_het:.3g}  "
+                    f"({'lift differs by level' if p_het < 0.05 else 'no detectable difference in lift between levels'})"
+                )
+
+        # 2. Winner per level vs the context-blind winner (optimized arm, full window).
+        # Cross-check only: allocation inside the optimized arm is adaptive, so
+        # these cells are not a randomized comparison. The model leads this claim.
+        cells = defaultdict(lambda: defaultdict(int))  # (variant, level) -> outcome -> users
+        pooled_cells = defaultdict(lambda: defaultdict(int))
+        conv_traffic = defaultdict(lambda: defaultdict(int))  # level -> variant -> users (converged window)
+        for r in rows:
+            if r["in_holdout"]:
+                continue
+            cells[(r["variant"], level_of(r))][r["outcome_key"]] += r["users"]
+            pooled_cells[r["variant"]][r["outcome_key"]] += r["users"]
+            if not since or r["day"] >= since:
+                conv_traffic[level_of(r)][r["variant"]] += r["users"]
+        level_users = {lv: sum(sum(c.values()) for (v, l), c in cells.items() if l == lv) for lv in levels}
+        total_users = sum(level_users.values())
+        # Eligible everywhere, so the context-blind candidate can be valued in each level.
+        eligible = [
+            v for v in pooled_cells
+            if all(sum(cells[(v, lv)].values()) >= MIN_CELL_USERS for lv in levels)
+        ]
+        if not eligible:
+            print(f"no variant has >= {MIN_CELL_USERS} users in every level: winners by level cannot be compared yet")
+            continue
+        # Context-blind winner: best level-share-weighted mean, so allocation skew between levels cannot pick it.
+        def blended(v):
+            return sum(level_users[lv] / total_users * counts_stats(cells[(v, lv)], value_of)[1] for lv in levels)
+
+        blind = max(eligible, key=blended)
+        print(
+            f"EMPIRICAL CROSS-CHECK, not randomized (adaptive allocation); the model leads the 'what context added' claim.\n"
+            f"winner by level (optimized arm, full window). Coverage: {len(eligible)} of {len(pooled_cells)} variants have "
+            f">= {MIN_CELL_USERS} users in every level: {', '.join(variant_label(v) for v in eligible)}"
+        )
+        print(f"  context-blind winner: {variant_label(blind)}  (value {blended(blind):.4g}, level-share weighted)")
+        gain, gain_var, differs = 0.0, 0.0, False
+        for lv in levels:
+            best = max(eligible, key=lambda v: counts_stats(cells[(v, lv)], value_of)[1])
+            bn, bm, bv = counts_stats(cells[(best, lv)], value_of)
+            gn, gm, gv = counts_stats(cells[(blind, lv)], value_of)
+            served = conv_traffic[lv]
+            served_tot = sum(served.values())
+            top_served = max(served, key=served.get) if served else None
+            served_txt = (
+                f"model serves {variant_label(top_served)} to {served[top_served] / served_tot * 100:.1f}% here"
+                if top_served and served_tot else "no converged-window traffic"
+            )
+            if best == blind:
+                print(f"  {lv or '(missing)':<22} winner {variant_label(best)}  value {bm:.4g} (n={bn})  = context-blind winner;  {served_txt}")
+                continue
+            differs = True
+            d = bm - gm
+            se = math.sqrt(bv / bn + gv / gn)
+            z = d / se if se > 0 else float("nan")
+            wgt = level_users[lv] / total_users
+            gain += wgt * d
+            gain_var += (wgt * se) ** 2
+            print(
+                f"  {lv or '(missing)':<22} winner {variant_label(best)}  value {bm:.4g} (n={bn})  vs context-blind winner "
+                f"{gm:.4g} (n={gn}): {d:+.2f} (z = {z:+.1f}{'' if abs(z) >= 2 else ', directional'});  {served_txt}"
+            )
+
+        # 3. Variant × context interaction, day-controlled, eligible variants only.
+        cube = defaultdict(lambda: defaultdict(int))  # (day, variant, level) -> outcome -> users
+        for r in rows:
+            if r["in_holdout"] or r["variant"] not in eligible:
+                continue
+            cube[(r["day"], r["variant"], level_of(r))][r["outcome_key"]] += r["users"]
+        cdays = sorted({d for (d, _, _) in cube})
+        ev, el = eligible[1:], levels[1:]
+
+        def xrow(d, v, lv, interact):
+            row = [1.0] + [1.0 if v == x else 0.0 for x in ev] + [1.0 if lv == x else 0.0 for x in el]
+            row += [1.0 if d == dd else 0.0 for dd in cdays[1:]]
+            if interact:
+                row += [1.0 if (v == x and lv == y) else 0.0 for x in ev for y in el]
+            return row
+
+        k0 = 1 + len(ev) + len(el) + len(cdays) - 1
+        d1 = len(ev) * len(el)
+        if d1 > 0:
+            g0, g1 = [], []
+            for (d, v, lv), counts in cube.items():
+                n, mean, var = counts_stats(counts, value_of)
+                if n:
+                    g0.append((xrow(d, v, lv, False), n, mean, var))
+                    g1.append((xrow(d, v, lv, True), n, mean, var))
+            _b0, rss0, n_tot = wls(g0, range(k0))
+            _b1, rss1, _ = wls(g1, range(k0 + d1))
+            d2 = n_tot - (k0 + d1)
+            if d2 > 0 and rss1 > 0:
+                F = ((rss0 - rss1) / d1) / (rss1 / d2)
+                print(f"variant × {cf} test (day-controlled, optimized arm, eligible variants): F({d1},{d2}) = {F:.2f}, p = {f_sf(F, d1, d2):.3g}")
+        else:
+            print(f"variant × {cf} test: needs at least two eligible variants")
+
+        # 4. What personalization added over serving the context-blind winner to everyone.
+        base = blended(blind)
+        if not differs:
+            print(
+                f"personalization value (empirical): 0 among the {len(eligible)} comparable variants; the same one wins in "
+                f"every level of {cf}. Write 'no benefit detected so far', and only if the model agrees"
+            )
+        else:
+            se = math.sqrt(gain_var)
+            print(
+                f"personalization value (empirical): {gain:+.3f} per user ({fmt_pct(gain / base) if base else 'n/a'} of the context-blind winner's value), "
+                f"95% CI [{gain - 1.96 * se:+.3f}, {gain + 1.96 * se:+.3f}]  "
+                "(upper-biased: each level's winner is the maximum of noisy means; claim it only when the interaction test is significant)"
+            )
+    print("(context levels differ in baseline value; compare lifts, not raw values, across levels)")
 
 
 def main():
@@ -502,6 +700,17 @@ def main():
                 line.append(f"{dev:+7.2f} ({z:+.1f}z) n={obs_n}".rjust(14))
             print(f"{x:>16} " + " | ".join(line))
         print("(mask cells with small n in the report; |z|<2 rows are directional — see cross-effects checklist)")
+
+    # ── CONTEXT (cube basis) ──────────────────────────────────────────────
+    context_factors = mix.get("context_factors") or []
+    configured_context = [f.get("name") for f in (model_config.get("context_factors") or [])]
+    if context_factors and any(r.get("context") for r in rows):
+        context_section(rows, context_factors, results, value_of, since)
+    elif configured_context:
+        print(f"\n== CONTEXT ==\nmodel has context factors {configured_context} but the cube carries no context dimension")
+        for imp in results.get("context_importance") or []:
+            print(f"model context importance {imp.get('factor')}: mean {imp.get('mean') or 0:.3f}  [model estimate]")
+        print("(per-context figures unavailable from this pack; report the model's context importance only)")
 
     print("\nBases reminder: published/holdout_daily figures share the platform estimand (weight of first in-window matched")
     print("outcome per user); the cube's mix shares are user counts on the same attribution. Variant rates are per exposure.")

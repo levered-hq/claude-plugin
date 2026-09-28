@@ -2,7 +2,7 @@
 
 The platform doesn't publish interaction metrics, so deriving them is the analyst's own work — and the part of the report most likely to go confidently wrong. Two methods (screen, then test) and two interpretation traps that have each produced a plausible-but-false narrative in real reports.
 
-This is **design×design** only. Context×design ("wins on mobile, loses on desktop") needs the context-aware model state that isn't shipped yet (#333) — say so rather than guessing.
+This file covers **design×design**. Context×design ("wins for new users, loses for retained users") is led by the model (context importance today, per-context posteriors once #333 ships), with the script's CONTEXT section as the empirical cross-check under the same rules as here: the day-controlled test gates every claim, |z| < 2 is *directional*, and a pattern claim ships with its full evidence. The cross-check is not randomized (allocation inside the optimized arm is adaptive), so it supports a claim and never carries one alone. Lift per context level against the holdout is randomized and always measured.
 
 ## Method 1 — screen from the posterior means
 
