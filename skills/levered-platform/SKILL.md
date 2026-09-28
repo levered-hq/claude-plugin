@@ -46,7 +46,10 @@ levered optimizations update <id> --status live            # Update optimization
 levered optimizations update <id> \
   --design-factors '[{"name":"headline","levels":["Fast","Reliable"]}]' \
   --excluded-combinations '[...]'                          # Replace factors/levels — DRAFT ONLY (rebuilds the model; pass exclusions again, stored ones are dropped)
-levered optimizations archive <id> -y                      # Archive optimization (use -y to skip confirmation)
+levered optimizations update <id> --status paused          # Pause (resume with --status live)
+levered optimizations ship <id> -y                         # Ship winner: leading variant per context to 100% of traffic; learning + holdout off, results frozen. Undo: update --status live
+levered optimizations stop <id> -y                         # Stop for good (status completed): users get the app's fallback; cannot be resumed
+levered optimizations archive <id> -y                      # Archive optimization (use -y to skip confirmation); a shipped one must be stopped first
 levered optimizations delete <id> -y                       # Delete: drafts/never-served are removed for real; ARCHIVED ones are hidden with data retained; live ones must be archived first
 levered optimizations observations <id>                    # View observations/training data
 ```
