@@ -537,7 +537,7 @@ def main():
         print(f"converged-window start used: {since} (leader >=50% of optimized traffic; override with --since)")
 
     # ── GUARDRAILS ────────────────────────────────────────────────────────
-    print("\n== GUARDRAILS (quote as published) ==")
+    print("\n== GUARDRAILS (quote as published; health metrics: report movement as a trade-off vs. the reward; `status` is a monitoring flag, never a gate on the recommendation) ==")
     for g in (guardrails.get("guardrails") or []):
         print(f"  {json.dumps(g, default=str)[:400]}")
 
