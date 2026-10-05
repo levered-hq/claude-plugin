@@ -1,7 +1,7 @@
 {
   "name": "levered",
-  "description": "Levered optimization platform — create and manage A/B tests and contextual bandits directly from Claude Code",
-  "version": "0.6.2",
+  "description": "Levered optimization platform: create and manage real-time product optimization and personalization directly from Claude Code",
+  "version": "0.6.3",
   "author": {
     "name": "Levered"
   },
@@ -10,8 +10,8 @@
   "license": "MIT",
   "keywords": [
     "optimization",
-    "ab-testing",
+    "personalization",
     "contextual-bandit",
-    "experimentation"
+    "self-optimizing-products"
   ]
 }

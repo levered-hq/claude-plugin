@@ -1,6 +1,6 @@
 # Levered Plugin for Claude Code
 
-Create and manage A/B tests and contextual bandits directly from Claude Code.
+Create and manage real-time product optimization and personalization directly from Claude Code.
 
 ## Install
 
@@ -23,7 +23,7 @@ Tell Claude what you want to optimize and it handles the rest:
 
 | Skill | Trigger | Description |
 |-------|---------|-------------|
-| `levered-platform` | Automatic | Activates when you mention optimizations, A/B tests, experiments, variants, or bandits. Runs CLI commands and helps with the platform. |
+| `levered-platform` | Automatic | Activates when you mention optimizations, variants, personalization, lift, or conversion. Runs CLI commands and helps with the platform. |
 | `growth-engineer` | `/growth-engineer [what to optimize]` | End-to-end workflow. Analyzes your code, creates the optimization, integrates the SDK. |
 | `growth-analyst` | `/growth-analyst [optimization or "all"]` | Reads your results. Tells you which variant is winning and why, the lift vs. baseline, which factors matter, and whether to keep running, prune, or ship. |
 

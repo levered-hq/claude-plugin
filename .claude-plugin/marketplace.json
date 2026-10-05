@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "levered",
-      "description": "Levered optimization platform — create and manage A/B tests and contextual bandits directly from Claude Code",
+      "description": "Levered optimization platform: create and manage real-time product optimization and personalization directly from Claude Code",
       "version": "0.4.0",
       "source": {
         "source": "github",
