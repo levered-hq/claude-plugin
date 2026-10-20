@@ -50,6 +50,10 @@ This is the same failure family as pooling across a holdout-% change (SKILL.md v
 
 The holdout comparison is per *user*. The per-variant `rate` in `results` is per *exposure* when the per-user rollup isn't populated (the fields are then named `exposures`/`conversions`, not `users`/`converting_users`). A user can be exposed many times, so the two bases are not comparable — never quote them side by side as if they were, and label exposure-based columns **Exposures**.
 
+## Matured users only
+
+Each variant also carries `matured_users` / `matured_converting_users`: the users whose conversion window has closed. The model trains on those alone, and the dashboard's Observed rate and vs-baseline lift are computed from them. Quote the matured pair when reading a variant's observed rate; `users - matured_users` are still inside the window and can't have converted yet. Counting them makes the variant that most recently received traffic look worst — which is usually the one the model is routing traffic *to* — and that reading contradicts Probability of best (Taxfix, 2026-10-19: variant 2 led on probability of best and read -7.7% vs baseline because half its users were still in the 24h window). The fields are null when the rollup predates them; fall back to `users` / `converting_users` then and say the rate includes pending users.
+
 ## The FM models interactions
 
 A factor can matter only *in combination* — the factorization machine fits pairwise structure the per-level table hides. Reading those interactions correctly has its own traps: see [cross-effects.md](cross-effects.md).
