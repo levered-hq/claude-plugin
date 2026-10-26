@@ -10,6 +10,12 @@ Each variant carries `expected_reward_mean` plus `expected_reward_lo`/`expected_
 
 The reference variant is the index-0 level of every factor. Lift for any variant is `(p_variant − p_baseline) / p_baseline`. This is why the baseline level is never pruned — it's the measurement anchor. Levered also forces traffic to the baseline (the holdout is served the baseline), so it stays well-measured even when the bandit's own weight on it reaches zero.
 
+The API, not the key convention, says which variant that is: each variant in `results` carries `is_baseline`, and `stats.reference` says what every lift figure is measured against — `"baseline"` or, for an optimization created without one (`has_baseline: false`), `"equal_split"`.
+
+## No baseline = even split
+
+A brand-new experience (a new screen, a CRM-triggered flow) has no "what users saw before", so it is created without a baseline: no variant is the original, there is no holdout, and `primary_metric_vs_holdout` is empty. The model then measures the policy against an **even split of traffic across the servable variants** — the counterfactual of picking one at random — on the same posterior draws: `estimated_improvement_percent` is policy vs. even split, `best_vs_baseline_percent` is the best variant vs. even split, `estimated_improvement_confidence` is P(policy beats the even split), and `estimated_progress` is how far the allocation has moved from that split toward the best variant. These are the only lift figures such an optimization has, so they lead — labeled as model estimates, with the reference named. The stale-baseline trap below does not apply: there is no baseline arm to go stale.
+
 ## Weight IS P(best)
 
 Thompson sampling is probability matching. For every variant, exactly:

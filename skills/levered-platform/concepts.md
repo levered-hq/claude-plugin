@@ -51,6 +51,9 @@ Each time a variant is served to a user, that's an exposure. Exposures are logge
 ### Lift
 The improvement in conversion rate that Levered's optimization provides over random/uniform assignment. Shown as a percentage with confidence intervals.
 
+### Baseline
+The variant that is the current experience: the one with every factor at its first level. Lift is measured against it and the holdout serves it. An optimization can also be created **without** a baseline (`--no-baseline`) when every variant is new — a new screen, a CRM-triggered flow — and nothing existed before. Then there is no holdout and no guardrails, and the dashboard reports lift against an even split of traffic across the variants (what picking one at random would earn). The results API says which applies: `stats.reference` is `"baseline"` or `"equal_split"`, and each variant carries `is_baseline`.
+
 ### Serve
 The API call that returns the best variant for a given user. The model uses Thompson Sampling to select, considering the user's context if available.
 

@@ -117,6 +117,13 @@ Before creating anything or touching code, present the proposed reward, factors,
 
 **Cite the evidence, briefly.** If the knowledge base shaped the design, name the source inline in the hypothesis — "PostHog shows 62% drop off at the plan step" or "per the pricing doc, the 14-day trial is real." One clause, not a section, and only where it genuinely drove a choice. Evidence the user can trace is what separates a proposal they can trust from one they have to take on faith. If you worked from the codebase alone, say nothing about it.
 
+**Decide whether there is a baseline.** Every optimization is one of two kinds, and the proposal must say which:
+
+- **Has a baseline** — one combination of levels is what users see today. List that level **first** in every factor, so the all-first-levels variant *is* the current experience: lift is measured against it and the holdout serves it. This is the normal case.
+- **No baseline** — nothing existed before: a new screen, a new flow, a CRM-triggered experience whose every variant is new. Then there is no "what users saw before" to measure against, so the optimization is created with `--no-baseline` (step 7): no holdout, no health metrics, and lift is reported against an even split of traffic across the variants (what picking one at random would earn).
+
+If the brief doesn't make it obvious, ask in one sentence ("Is one of these what users see today, or is the whole screen new?") before proposing. Never label a brand-new variant as the baseline just because it is listed first: the dashboard would then report every other variant's lift against it, which is meaningless.
+
 **Don't narrate the rules you're following.** Present factors, levels, and the *positive* hypothesis for why they'll move the metric. Then stop. Do **not** add trailing lines like "no invented content / no fabricated stats" or "excluding colors since they don't move the metric" — these read as defensive and waste the user's attention on the obvious. Just follow the rule; don't announce that you're following it. If the user later asks why something is missing, explain then.
 
 Example:
@@ -251,6 +258,8 @@ levered optimizations create \
 ```
 
 The `--design-factors` JSON must match the factors and levels the user just approved in the prototype. Choose a clear, descriptive name. Don't ask the user what to name it.
+
+Add `--no-baseline` when the design has no baseline (decided in step 3): every variant is new, so the optimization gets no holdout and no health metrics, and the dashboard reports lift against an even split of traffic instead of a baseline variant. Without the flag, the all-first-levels variant is the baseline and must be the current experience.
 
 ### 8. Wire up `useVariant` (swap the preview scaffold)
 

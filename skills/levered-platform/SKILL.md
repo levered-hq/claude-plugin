@@ -41,6 +41,7 @@ levered optimizations create \
   --reward-name reward \
   --reward-type bool \
   --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
+  --no-baseline                                            # optional; every variant is new (no current experience): no holdout, no guardrails, lift vs an even split of traffic
                                                            # Create optimization
 levered optimizations update <id> --status live            # Update optimization status
 levered optimizations update <id> \
