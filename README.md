@@ -11,20 +11,20 @@ Create and manage real-time product optimization and personalization directly fr
 
 ## What it does
 
-Tell Claude what you want to optimize and it handles the rest:
+Your AI growth engineer. Ask it to improve your product — or just run `/growth-engineer` — and it leads:
 
-- Installs the Levered CLI if needed
-- Analyzes your code to determine what to vary
-- Creates the optimization on the Levered platform
-- Integrates the SDK into your codebase
-- Gets you live
+- Finds where your product loses conversions, from your code, your live pages and your analytics
+- Proposes what to change, sized to your traffic, and prototypes it in your app so you can click through every variant
+- Launches it on Levered (SDK, or the hosted web tag for pages outside your repo) and confirms it's working
+
+It keeps its memory in a `.levered/` folder in your repository, so any session picks up where the last one left off.
 
 ## Skills
 
 | Skill | Trigger | Description |
 |-------|---------|-------------|
 | `levered-platform` | Automatic | Activates when you mention optimizations, variants, personalization, lift, or conversion. Runs CLI commands and helps with the platform. |
-| `growth-engineer` | `/growth-engineer [what to optimize]` | End-to-end workflow. Analyzes your code, creates the optimization, integrates the SDK. |
+| `growth-engineer` | `/growth-engineer [what to optimize]` | Your growth engineer, end to end: finds what to optimize, prototypes it in your app, and launches it. |
 | `growth-analyst` | `/growth-analyst [optimization or "all"]` | Reads your results. Tells you which variant is winning and why, the lift vs. baseline, which factors matter, and whether to keep running, prune, or ship. |
 
 ## Session sharing

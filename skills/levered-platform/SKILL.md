@@ -37,7 +37,6 @@ levered optimizations create \
   --name "..." \
   --design-factors '[{"name":"headline","levels":["Fast","Reliable","Simple"]}]' \
   --reward-metric-id <uuid> \
-  --model-type cmab \
   --reward-name reward \
   --reward-type bool \
   --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
@@ -131,19 +130,19 @@ levered serve <optimization-id> --dry-run                  # Preview — no expo
 
 Warehouse connection is a one-time setup best done from the dashboard UI. If no warehouse is connected (`levered warehouse status` shows "Not connected"), direct the user to:
 
-**[Settings > Warehouse](https://app.levered.dev)** in the Levered dashboard.
+the **[Warehouse](https://app.levered.dev/warehouse)** page in the Levered dashboard.
 
 Supported providers: BigQuery, PostgreSQL, Snowflake. Docs: [Connect your warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse)
 
 ## Managed Warehouse (Levered-hosted)
 
-The fastest setup. Instead of connecting BigQuery/Snowflake/Postgres, the org can use the **Managed Warehouse** — Levered hosts the dataset and the org **sends events to the ingestion API**. Enable it in the dashboard at **Settings > Warehouse > Managed Warehouse** ("Hosted by Levered"). Docs: [Managed Warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse/managed)
+The fastest setup. Instead of connecting BigQuery/Snowflake/Postgres, the org can use the **Managed Warehouse** — Levered hosts the dataset and the org **sends events to the ingestion API**. Enable it in the dashboard's **Warehouse** page (https://app.levered.dev/warehouse → **Managed Warehouse**, "Hosted by Levered"). Docs: [Managed Warehouse](https://docs.levered.dev/docs/getting-started/connect-warehouse/managed)
 
 When an org is on the managed warehouse, **exposures and rewards are written to Levered via the ingestion API** — there is no customer warehouse to query and no tables to create. Do **not** route them to a customer warehouse or rely on the SDK `onExposure` → your-own-warehouse path; instead POST them to Levered. Training reads the managed dataset automatically.
 
 ### Authentication — API key
 
-Ingestion is authenticated with an **API key** (NOT the dashboard/Clerk session). Create one in the dashboard at **Settings > API Keys** — the secret is shown once. Send it as `Authorization: Bearer <api_key>` (or the `X-API-Key` header). When wiring code, read it from an env var (e.g. `LEVERED_API_KEY`). Treat it as a **server-side write secret**: add it to a backend env / deployment secret, never a `NEXT_PUBLIC_`/`VITE_` client var or the browser bundle — send ingestion calls from the app's backend (or a proxy route), not directly from the client.
+Ingestion is authenticated with an **API key** (NOT the dashboard/Clerk session). Create one with `levered api-keys create --label <app> --key-only` (or on the dashboard's Warehouse page) — the secret is shown once. Send it as `Authorization: Bearer <api_key>` (or the `X-API-Key` header). When wiring code, read it from an env var (e.g. `LEVERED_API_KEY`). Treat it as a **server-side write secret**: add it to a backend env / deployment secret, never a `NEXT_PUBLIC_`/`VITE_` client var or the browser bundle — send ingestion calls from the app's backend (or a proxy route), not directly from the client.
 
 ### Ingestion API
 
@@ -191,7 +190,7 @@ A metric query must return:
 - **Numeric** — uses the `value` column to weight rewards (e.g., revenue)
 
 ### The `@start_date` parameter
-Levered injects `@start_date` at training time. Always include it in your `WHERE` clause to avoid full table scans:
+On the org's **own** warehouse, Levered injects `@start_date` at training time. Always include it in your `WHERE` clause there to avoid full table scans (on the Managed Warehouse, leave it out — see below):
 ```sql
 SELECT user_id AS anonymous_id, converted_at AS timestamp
 FROM conversions
@@ -216,14 +215,14 @@ That wrapper references `organization_id` and `optimization_id` on your query's 
 ```sql
 -- ✅ correct on the managed warehouse
 SELECT * FROM managed_dw.rewards
-WHERE name = 'signup_completed' AND timestamp_utc >= @start_date
+WHERE name = 'signup_completed'
 
 -- ❌ breaks at training time: "Name organization_id not found inside _levered_reward_scope"
 SELECT anonymous_id AS anonymous_id, timestamp_utc AS timestamp
 FROM managed_dw.rewards WHERE name = 'signup_completed'
 ```
 
-Then map the real column names: `--anonymous-id-col anonymous_id --timestamp-col timestamp_utc` (and `--value-col value` for numeric rewards). The save-time dry-run now validates the wrapped query, so this mistake is rejected at `metrics create` instead of silently breaking `/results`.
+Then map the real column names: `--anonymous-id-col anonymous_id --timestamp-col timestamp_utc` (and `--value-col value` for numeric rewards). The save-time dry-run now validates the wrapped query, so this mistake is rejected at `metrics create` instead of silently breaking `/results`. That dry-run binds no parameters, so a managed metric **must not use `@start_date`** ("Query parameter 'start_date' not found"); Levered scopes managed reads itself.
 
 **Managed table schemas** (dataset `managed_dw`, BigQuery):
 
@@ -234,7 +233,7 @@ Then map the real column names: `--anonymous-id-col anonymous_id --timestamp-col
 | `anonymous_id` | STRING | join key to exposures |
 | `name` | STRING | metric name, e.g. `signup_completed` — filter on this |
 | `value` | FLOAT64 | numeric reward amount (defaults to 1) |
-| `timestamp_utc` | TIMESTAMP | event time; filter with `@start_date` |
+| `timestamp_utc` | TIMESTAMP | event time (no `@start_date` filter on the managed warehouse) |
 | `organization_id` | STRING | tenancy — surfaced by `SELECT *` |
 | `optimization_id` | STRING | nullable; NULL = global reward attributed by `name` |
 | `properties` | JSON | arbitrary metadata sent at ingestion |
@@ -344,7 +343,7 @@ import { LeveredAdminMenu } from '@levered_dev/sdk/react';
 
 ### Warehouse connection fails
 - Check `levered warehouse status` to see if a warehouse is connected.
-- If not connected, direct the user to set it up in the dashboard (Settings > Warehouse).
+- If not connected, direct the user to set it up in the dashboard's Warehouse page (https://app.levered.dev/warehouse).
 
 ### Model not learning / no lift
 - Check that exposures are being logged to the warehouse (query the exposure table).
