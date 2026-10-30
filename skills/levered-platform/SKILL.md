@@ -40,8 +40,10 @@ levered optimizations create \
   --reward-name reward \
   --reward-type bool \
   --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
-  --no-baseline                                            # optional; every variant is new (no current experience): no holdout, no guardrails, lift vs an even split of traffic
-  --holdout 10                                             # optional; % of traffic held out on the baseline to measure lift, 0-50 (default 10; must be 0 with --no-baseline)
+  --control variant|external|none                          # optional; what users outside the optimization see: a variant (default), a version that is none of the variants (needs a holdout; holdout never trains), or nothing (every variant new: no holdout, no guardrails)
+  --holdout 10                                             # optional; share of traffic kept as the holdout, 0-50 (default 10)
+  --baseline '{"headline":"Fast"}'                         # optional, with --control variant; today's experience when it isn't every factor's first level
+  --no-baseline                                            # legacy alias for --control none
                                                            # Create optimization
 levered optimizations update <id> --status live            # Update optimization status
 levered optimizations update <id> \

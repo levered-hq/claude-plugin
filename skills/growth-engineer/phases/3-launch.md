@@ -55,7 +55,7 @@ levered optimizations create \
   --json
 ```
 
-`dtype` is `str` or `bool`; the first level of each factor is today's experience. It must match what the user approved. With no baseline (phase 1 §4), add `--no-baseline`: there's no holdout and no health metrics, and the gain is measured against an even split of traffic across the versions. It needs CLI 0.1.12 or later; if `create` doesn't know the flag, update the CLI with the install commands in §1. It's created as a **draft**: nothing is served until it goes live.
+`dtype` is `str` or `bool`; the first level of each factor is today's experience. It must match what the user approved. Pass what users outside the optimization see (phase 1 §4): nothing for a baseline among the versions; `--control external --holdout <pct>` when the holdout keeps a version that is none of the combinations (check that the holdout branch ignores the returned variant and still logs the exposure); `--control none` when every version is new (no holdout, no health metrics, gain measured against an even split of traffic). `--control` and `--holdout` need CLI 0.1.13 or later; if `create` doesn't know a flag, update the CLI with the install commands in §1. It's created as a **draft**: nothing is served until it goes live.
 
 ## 6. Wire it and prove it works
 
@@ -73,7 +73,7 @@ Commit to the prototype branch; open a pull request if `gh` is available, otherw
 
 ## 7. Go live
 
-Going live is worth it once events can reach Levered. Run `levered serve <id> --dry-run --json`, then ask once, as a card: "Go live? Once you deploy the branch, visitors on <surface> will see the <n> versions; <holdout>% keep today's page so we can measure the gain." (with no baseline, leave out the holdout clause) **[Go live (Recommended)] [Not yet]**. Then `levered optimizations update <id> --status live`, and confirm with `levered optimizations show <id>`. If they can't deploy yet, say it's waiting on their deploy in `.levered/STATUS.md` (step 9).
+Going live is worth it once events can reach Levered. Run `levered serve <id> --dry-run --json`, then ask once, as a card: "Go live? Once you deploy the branch, visitors on <surface> will see the <n> versions; <holdout>% keep today's page so we can measure the gain." (with `--control none`, leave out the holdout clause; with `--control external`, say "keep the current version") **[Go live (Recommended)] [Not yet]**. Then `levered optimizations update <id> --status live`, and confirm with `levered optimizations show <id>`. If they can't deploy yet, say it's waiting on their deploy in `.levered/STATUS.md` (step 9).
 
 ## 8. Screenshots for the dashboard
 
