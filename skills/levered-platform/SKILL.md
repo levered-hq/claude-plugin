@@ -49,6 +49,8 @@ levered optimizations update <id> \
   --excluded-combinations '[...]'                          # Replace factors/levels — DRAFT ONLY (rebuilds the model; pass exclusions again, stored ones are dropped)
 levered optimizations update <id> --holdout 20             # Change the holdout % (0-50) — DRAFT ONLY; fixed once live
 levered optimizations update <id> --status paused          # Pause (resume with --status live)
+levered optimizations update <id> --no-baseline            # Remove the baseline: lift vs an even split. Holdout must be 0 and guardrails removed first (API returns 400 otherwise)
+levered optimizations update <id> --baseline               # Restore the baseline (all-first-levels variant)
 levered optimizations variants list <id>                   # Variant numbers with baseline / paused / excluded state
 levered optimizations variants pause <id> <n> -y           # Stop serving variant #n — DRAFT ONLY; never the baseline, at least 2 stay active
 levered optimizations variants resume <id> <n>             # Serve a paused variant again — DRAFT ONLY
