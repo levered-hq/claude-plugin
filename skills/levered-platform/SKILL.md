@@ -41,12 +41,17 @@ levered optimizations create \
   --reward-type bool \
   --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
   --no-baseline                                            # optional; every variant is new (no current experience): no holdout, no guardrails, lift vs an even split of traffic
+  --holdout 10                                             # optional; % of traffic held out on the baseline to measure lift, 0-50 (default 10; must be 0 with --no-baseline)
                                                            # Create optimization
 levered optimizations update <id> --status live            # Update optimization status
 levered optimizations update <id> \
   --design-factors '[{"name":"headline","levels":["Fast","Reliable"]}]' \
   --excluded-combinations '[...]'                          # Replace factors/levels — DRAFT ONLY (rebuilds the model; pass exclusions again, stored ones are dropped)
+levered optimizations update <id> --holdout 20             # Change the holdout % (0-50) — DRAFT ONLY; fixed once live
 levered optimizations update <id> --status paused          # Pause (resume with --status live)
+levered optimizations variants list <id>                   # Variant numbers with baseline / paused / excluded state
+levered optimizations variants pause <id> <n> -y           # Stop serving variant #n — DRAFT ONLY; never the baseline, at least 2 stay active
+levered optimizations variants resume <id> <n>             # Serve a paused variant again — DRAFT ONLY
 levered optimizations ship <id> -y                         # Ship winner: leading variant per context to 100% of traffic; learning + holdout off, results frozen. Undo: update --status live
 levered optimizations stop <id> -y                         # Stop for good (status completed): users get the app's fallback; cannot be resumed
 levered optimizations archive <id> -y                      # Archive optimization (use -y to skip confirmation); a shipped one must be stopped first
