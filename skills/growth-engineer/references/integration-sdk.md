@@ -14,6 +14,7 @@ Now replace the local-override scaffolding with a real `useVariant` hook bound t
          optimization_id: exposure.optimizationId,
          anonymous_id: exposure.anonymousId,
          variant: exposure.variant,
+         is_holdout: exposure.isHoldout,
          timestamp: new Date().toISOString(),
        });
      }}
@@ -67,7 +68,8 @@ Now replace the local-override scaffolding with a real `useVariant` hook bound t
 
 3. **Keep `LeveredAdminMenu`** for internal QA — pass `enabled={process.env.NODE_ENV !== 'production'}` so it disappears in prod.
 
-4. **The anonymous id** is the one from the prototype ([prototype.md](prototype.md)), and the reward must carry the same id. On a connected warehouse, the exposure must land with `anonymous_id`, `optimization_id`, `variant` and `timestamp` columns.
+4. **The anonymous id** is the one from the prototype ([prototype.md](prototype.md)), and the reward must carry the same id. On a connected warehouse, the exposure must land with `anonymous_id`, `optimization_id`, `variant`, `timestamp` and `is_holdout` columns; if the app already logs exposures to a table with other names, keep it and map its columns (phase 3 §2).
+5. **The holdout branch.** When the holdout keeps an experience that is none of the versions (`--control external`, phase 1 §4), the app renders it whenever `isHoldout` is `true`, ignores the returned variant, and still logs the exposure with `is_holdout: true`. Levered leaves holdout users out of training by their id; empty factor values on those rows are optional.
 
 For non-React apps, use `LeveredClient` directly instead of the hook.
 

@@ -81,8 +81,14 @@ levered warehouse tables                                           # List tables
 levered warehouse columns <table>                                  # List columns
 levered warehouse query --sql "SELECT ..."                         # Run SQL query
 levered warehouse preview --sql "SELECT ..."                       # Preview query results
+levered warehouse exposure-columns                                 # Show which exposures-table columns hold the SDK id, time, variant
+levered warehouse exposure-columns --anonymous-id USER_ID \
+  --timestamp TIMESTAMP --variant VARIANT                          # Set them once per connection; new optimizations use them
 levered metrics list                                               # List metrics
 levered metrics preview <id>                                       # Preview metric data
+levered verify <optimization-id>                                   # Identity check: exposure ids vs reward ids, is_holdout rows vs holdout hash
+levered verify <optimization-id> --anonymous-id <test id>          # Managed Warehouse: also wait for that test user's exposure and reward
+levered serve <optimization-id> --anonymous-id <id> --dry-run --json  # What that user gets (variant, is_holdout); records nothing
 ```
 
 **The three reward-metric types** (these mirror the dashboard's "How is this reward measured?" picker — keep the CLI and UI in sync):
@@ -207,7 +213,7 @@ WHERE converted_at >= @start_date
 ```
 
 ### Key rule
-The `anonymous_id` in the metric query must match the `anonymousId` passed in the SDK. If these don't match, Levered can't join exposures with rewards and the model won't learn.
+The `anonymous_id` in the metric query must match the `anonymousId` passed in the SDK, and so must the id column of the exposures table. If they don't match, Levered can't join exposures with rewards, the model won't learn, and the holdout comparison (a hash of the SDK id) is wrong, all without an error. A table can hold both a device id and a user id: use the one the app passes to the SDK. `levered verify <optimization-id>` checks it.
 
 ### On the Managed Warehouse — `SELECT *`, never project columns away
 
