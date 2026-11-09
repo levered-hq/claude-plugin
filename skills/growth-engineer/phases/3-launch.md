@@ -54,7 +54,7 @@ On the org's own warehouse, write the SQL against its tables, with `@start_date`
 ```bash
 levered optimizations create \
   --name "<surface> — <the changes, joined with ×>" \
-  --design-factors '[{"name":"<factor>","dtype":"str","levels":["<today>","<option>"]},{"name":"<factor>","dtype":"str","levels":["<today>","<option>"]}]' \
+  --design-factors '[{"name":"<factor>","dtype":"str","label":"<plain name>","description":"<what it changes>","hypothesis":"<why it should win>","levels":[{"value":"<today>","label":"<plain name>","description":"<what a visitor sees>"},{"value":"<option>","label":"<plain name>","description":"<what a visitor sees>"}]}]' \
   --reward-metric-id <metric-id> \
   --reward-name reward \
   --reward-type bool \
@@ -62,6 +62,8 @@ levered optimizations create \
 ```
 
 `dtype` is `str` or `bool`; the first level of each factor is today's experience. It must match what the user approved. Pass what users outside the optimization see (phase 1 §4): nothing for a baseline among the versions; `--control external --holdout <pct>` when the holdout keeps a version that is none of the combinations (check that the holdout branch ignores the returned variant and still logs the exposure); `--control none` when every version is new (no holdout, no health metrics, gain measured against an even split of traffic). `--control` and `--holdout` need CLI 0.1.15 or later; if `create` doesn't know a flag, update the CLI with the install commands in §1. It's created as a **draft**: nothing is served until it goes live.
+
+**Describe every factor and level.** The `name`s and `value`s are what the code receives and never change. Next to them, give each factor a `label`, a one-sentence `description` of what it changes and the approved design's `hypothesis`; give each level a short `label` and a one-sentence `description` of what a visitor actually sees in it: its content, not its name ("Headline warns about the refund left unclaimed", not "Loss framing"). They label the dashboard and results, and they are how later optimizations learn from this one. Write them yourself from the design and the prototype; you built both. Ask only when you can't tell what a level shows (a value the user brought in, a version built outside this session): one question naming those levels, before `create`. If an optimization already exists without them, add them with `levered optimizations label` (the `levered-platform` skill); it needs CLI 0.1.18 or later.
 
 ## 6. Wire it and prove it works
 

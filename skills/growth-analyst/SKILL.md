@@ -119,6 +119,7 @@ Rules that keep it customer-safe:
 - **Succinct copy, minimal prose.** Tables and short claim sentences. One bold claim sentence plus at most one supporting sentence per section opener; at most one or two sentences after any table. Multi-finding passages are bullets, one finding per bullet.
 - **Style: complete sentences, no dashes, affirmative statements.** Every table lead-in is a complete sentence. Ranges in prose read "500 to 700". No figurative idioms. Honest negatives ("no detectable change") keep their negation.
 - **No internal machinery.** No issue numbers, no CLI/dashboard discrepancies, no validation narration.
+- **Factors and levels by their labels.** When the pack's `model_config.design_factors` carries a `label`, name the factor or level by it, with the raw value in code font once where a reader may need to match it to the code. A level's `description` says what visitors saw; use it to explain why it won.
 - **Standalone test.** Nothing may require having followed the investigation.
 - **Claim strength tracks the data** — including the significance wording rule from the checklist.
 - **No charts** (user ruling 2026-08-03). Evidence that would have been a chart is a compact markdown table or is dropped. The only images are the two variant snapshots.

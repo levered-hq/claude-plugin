@@ -1,6 +1,6 @@
 # Phase 1 — First look
 
-Goal: within a minute or two, learn what the user wants more of and show them something true and useful about how **their own product** gets in the way of it: where it loses those conversions, why, and what you'd try instead. Three short turns: the goal; the insights, which they confirm or adjust; then what you'd try — the moment they decide the tool is worth it. This file is self-contained, and may be read on its own before the plugin is installed (see the end).
+Goal: within a minute or two, learn what the user wants more of and show them something true and useful about how **their own product** gets in the way of it: what on the page may hold visitors back, why, and what you'd try instead. Without their analytics you don't know where visitors drop off: never claim it. Three short turns: the goal; the insights, which they confirm or adjust; then what you'd try — the moment they decide the tool is worth it. This file is self-contained, and may be read on its own before the plugin is installed (see the end).
 
 **Each step after the goal is its content written out as text, ending with its question.** Both are markdown text in your reply and stay on the page after they answer: the question in a line, then its options numbered on one line, your pick first and marked (recommended), so they can answer with a number or in their own words. The user can't see your thinking: the findings reach them only as what you write. No preamble, no narration between reads, no recap of what you read.
 
@@ -18,7 +18,7 @@ In a single turn, read together: `package.json`, `index.html` or the app's root 
 
 From what you read, list the conversions this product records or offers: what the code tracks, the actions the page asks for, the steps of the funnel. Then, unless the user already named one, ask a single choice card (AskUserQuestion), with no table and no findings yet:
 
-- **Question:** in one or two short sentences, that you've read their product (name the site or app) and what they want more of, and that you'll show where visitors drop off for it. The context goes in the question itself, so the card makes sense on its own.
+- **Question:** in one or two short sentences, that you've read their product (name the site or app) and what they want more of, and that you'll show what on the page may hold visitors back from it. The context goes in the question itself, so the card makes sense on its own.
 - **First option, marked "(Recommended)":** the deepest conversion that still has the volume to learn, in plain words; its description says in one clause why (what you saw that records it).
 - **One or two more options:** other conversions you found, earlier or later in the funnel, each with one clause.
 

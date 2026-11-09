@@ -13,7 +13,7 @@ Create and manage real-time product optimization and personalization directly fr
 
 Your AI growth engineer. Ask it to improve your product — or just run `/growth-engineer` — and it leads:
 
-- Finds where your product loses conversions, from your code, your live pages and your analytics
+- Reviews your product for what may hold back conversions, from your code and live pages, and from your analytics when connected
 - Proposes what to change, sized to your traffic, and prototypes it in your app so you can click through every variant
 - Launches it on Levered (SDK, or the hosted web tag for pages outside your repo) and confirms it's working
 
