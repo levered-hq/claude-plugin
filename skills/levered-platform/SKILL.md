@@ -33,6 +33,9 @@ levered optimizations show <id>                            # Show optimization d
 levered optimizations results <id>                         # Get results: lift, variants, factor importance
 levered optimizations progress <id>                        # Days running, enrollment per arm, progress-to-best/convergence
 levered optimizations guardrails <id>                      # Guardrail metrics: bandit vs. holdout, lift, ok/violated status
+levered optimizations guardrail-add <id> --metric <name|id> --direction no-decrease|no-increase [--threshold <pct>] [--window 7d]  # Add a guardrail (any status)
+levered optimizations guardrail-update <id> --metric <name|id> [--direction ...] [--threshold <pct>] [--window 7d|none]  # Change a guardrail
+levered optimizations guardrail-remove <id> --metric <name|id>  # Remove a guardrail (the metric is kept)
 levered optimizations create \
   --name "..." \
   --design-factors '[{"name":"headline","levels":["Fast","Reliable","Simple"]}]' \
