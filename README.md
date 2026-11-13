@@ -9,6 +9,8 @@ Create and manage real-time product optimization and personalization directly fr
 /plugin install levered@levered
 ```
 
+Turn on auto-update so new plugin versions arrive by themselves: run `/plugin`, open Marketplaces, select `levered`, then Enable auto-update. Claude Code updates the plugin in the background, and the new version loads with the next session.
+
 ## What it does
 
 Your AI growth engineer. Ask it to improve your product — or just run `/growth-engineer` — and it leads:

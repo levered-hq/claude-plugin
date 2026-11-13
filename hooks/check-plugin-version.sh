@@ -49,7 +49,7 @@ latest="$(version_of "$cache")"
 # `sort -V`), so a local/dev build ahead of the public repo stays quiet.
 newest="$(printf '%s\n%s\n' "$installed" "$latest" | sort -V | tail -1)"
 if [ "$installed" != "$latest" ] && [ "$newest" = "$latest" ]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"A newer Levered plugin is available (installed %s, latest %s). The first time the user uses any Levered skill this session, BEFORE starting their task, tell them a newer version is available and ask whether to update first. If they agree, have them run: /plugin marketplace update levered , then /plugin update levered@levered , then /reload-plugins . Ask once — if they decline, continue with the task and do not raise it again this session."}}\n' \
+  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"A newer Levered plugin is available (installed %s, latest %s). The first time the user uses any Levered skill this session, BEFORE starting their task, tell them a newer version is available and ask whether to update first. If they agree, have them run: /plugin marketplace update levered , then /plugin update levered@levered , then /reload-plugins . Also suggest turning on auto-update so future versions arrive by themselves: /plugin , Marketplaces, levered, Enable auto-update. Ask once — if they decline, continue with the task and do not raise it again this session."}}\n' \
     "$installed" "$latest"
 fi
 exit 0
