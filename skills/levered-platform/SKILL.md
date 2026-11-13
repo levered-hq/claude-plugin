@@ -30,7 +30,8 @@ levered api-keys revoke <id>             # Revoke a key
 ```
 levered optimizations list                                 # List all optimizations
 levered optimizations show <id>                            # Show optimization details
-levered optimizations results <id>                         # Get results: lift, variants, factor importance
+levered optimizations results <id>                         # Get results: lift, variants, factor and level effects, context importance, interaction (model figures; `model.source` says where from)
+levered optimizations lift-history <id> [--days N]         # The model's policy/ceiling lift, one point per day
 levered optimizations progress <id>                        # Days running, enrollment per arm, progress-to-best/convergence
 levered optimizations guardrails <id>                      # Guardrail metrics: bandit vs. holdout, lift, ok/violated status
 levered optimizations guardrail-add <id> --metric <name|id> --direction no-decrease|no-increase [--threshold <pct>] [--window 7d]  # Add a guardrail (any status)
@@ -55,7 +56,7 @@ levered optimizations update <id> \
 levered optimizations update <id> --holdout 20             # Change the holdout % (0-50) — DRAFT ONLY; fixed once live
 levered optimizations update <id> --name "..." --description "..."   # Rename / redescribe — any status ("" clears the description)
 levered optimizations label <id> --factor <name> \
-  [--level <value|level-id>] --label "..." --description "..." [--hypothesis "..."]  # Display label + description of a factor or level — any status; what the SDK serves is unchanged ("" clears)
+  [--context | --level <value|level-id>] --label "..." --description "..." [--hypothesis "..."]  # Display label + description of a factor or level — any status; what the SDK serves is unchanged ("" clears)
 levered optimizations update <id> --status paused          # Pause (resume with --status live)
 levered optimizations update <id> --no-baseline            # Remove the baseline: lift vs an even split. Holdout must be 0 and guardrails removed first (API returns 400 otherwise)
 levered optimizations update <id> --baseline               # Restore the baseline (all-first-levels variant)
@@ -71,15 +72,21 @@ levered optimizations observations <id>                    # View observations/t
 
 **Editing a design.** While an optimization is still a draft, `levered optimizations update <id> --design-factors '<json>'` replaces the whole design (send every factor, not just the changed one). Levels given as plain values get fresh ids; to keep an existing level's id, pass it as `{"id":"lv_...","value":"..."}` as returned by `show`. Once live, factors and levels are locked — archive and create a new optimization instead.
 
-**Labels and descriptions.** A factor's `name` and a level's `value` are what the SDK serves, so they stay as the code expects them. Each factor can also carry a `label`, `description` and `hypothesis`, and each level a `label` and `description` (`{"value":"b","label":"Loss framing","description":"Headline warns about the refund left unclaimed."}`): pass them in `--design-factors` on `create`, or set them at any status with `optimizations label`. The dashboard and results show the labels. Always fill them: write them yourself when the code or design tells you what a level shows (describe what a visitor sees, not the name), and ask the user only for levels you can't work out. When `optimizations show` lists factors or levels without a description, offer to add them.
+**Labels and descriptions.** A factor's `name` and a level's `value` are what the SDK serves, so they stay as the code expects them. Each factor can also carry a `label`, `description` and `hypothesis`, and each level a `label` and `description` (`{"value":"b","label":"Loss framing","description":"Headline warns about the refund left unclaimed."}`): pass them in `--design-factors` on `create`, or set them at any status with `optimizations label`. Context factors take a `label`, `description` and `hypothesis` too (why personalizing on them should help): `optimizations label <id> --factor <name> --context`, CLI 0.1.20 or later. The dashboard and results show the labels. Always fill them: write them yourself when the code or design tells you what a level shows (describe what a visitor sees, not the name), and ask the user only for levels you can't work out. When `optimizations show` lists factors or levels without a description, offer to add them.
 
 **Variant space limit.** When creating an optimization, keep the total variant count (the product of all factor levels) **at or under 100**. The bandit needs enough exposures per variant to learn — beyond ~100 variants, traffic spreads too thin and convergence stalls. If a proposed design exceeds 100 (e.g. 5 factors × 3 levels = 243), drop or merge factors before calling `create`, and tell the user why.
 
 ### Models
 ```
 levered models list                      # List all models
-levered models state <model-id>          # Inspect model state (weights, posteriors)
+levered models state <model-id>          # Training counts: exposures and observed reward per variant
 levered models delete <model-id>         # Delete a model
+```
+
+### Posterior
+```
+levered posterior query <optimization-id> --sql '<sql>' [--param name=value] [--version <v>] [--json]
+                                         # Read-only SQL over the optimization's posterior draws: the source of every model figure (optimizations with model_source "store")
 ```
 
 ### Warehouse & Metrics

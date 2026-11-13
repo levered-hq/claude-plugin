@@ -15,7 +15,7 @@ The report below (sign-up screen, 6 August 2026) is a user-approved worked examp
 - **Variant table**: columns `# / Variant / Traffic / Exposures / Rate`; variant as the level tokens joined with `·`; winner row fully bold; original row italic with an `*original:*` prefix; contenders chosen by model estimate. One sentence after it on the baseline's thorough test and the traffic-column basis (share of optimized traffic).
 - **Variant snapshots (user rulings 2026-08-06)**: after the variant table, embed exactly two platform screenshots — the **winner** and the **original/baseline** — **side by side in a two-column GFM table** (header row = italic captions with variant number + levels, body row = the images), **embedded as base64 `data:image/png` URIs** so the single .md shows them on its own: no sidecar files, nothing to click, no Levered login needed by recipients. Then one sentence linking to the optimization in Levered (`https://app.levered.dev/optimizations/<id>#results`). No contender images.
 - **No all-variants appendix**: embedding every variant's snapshot in an appendix was tried and rejected (user ruling 2026-08-06, "too much"). The two body snapshots plus the optimization link are the report's entire visual footprint.
-- **Utilities table** grouped by factor (factor cell left empty on continuation rows), levels sorted descending within factor, original level marked `*(original)*` at 0, the winner's levels bold.
+- **Level-effects table** grouped by factor (factor cell left empty on continuation rows), levels sorted descending within factor, original level marked `*(original)*` at 0, the winner's levels bold. The figures are the pack's level effects (`model.factor_effects`, absolute `effect` in pp or `relative` in %), the dashboard's numbers; the factor cell may carry the factor effect ("worth +x%"). <!-- LEGACY(model-source) --> A `"bandit"` optimization without `model.factor_effects` (a fit from before bandit reported them) has no level effects; use the script's FACTOR UTILITIES instead.
 - **Interactions**: bold inline lead, the LR stat quoted as χ² with df and p, then a *top-deviations* table (`Combination / vs. additive / n`, deviations as pp with z in parentheses, sub-2 z labeled `directional` inline), then the FULL masked deviation matrix as a compact markdown table (rows = one factor's levels, columns = the other's, cells = deviation in pp, masked cells as `·`). Close with the bulleted `**What the interactions show: <claim>.**` block.
 - **Context effects** (only when the model has context factors; last block of *What wins and why*): bold inline lead with the claim, one table per context factor (`Level / Users / Holdout / Optimized / Lift / 95% CI / Winner / Winner's traffic`), one sentence on whether lift differs between levels, then the bulleted `**What context added: <claim>.**` block: the model's finding first (labeled *model estimate*), then the empirical cross-check with its coverage, then the consequence. Lift per level is measured; what context added is model-led, and a null result reads "no benefit detected so far". The Summary's *What wins and why* bullet states the verdict in one clause, and Recommended action settles the context factors for the next optimization. The exemplar below includes the block for a model with one context factor.
 - **Charts — RETIRED (2026-08-03).** No SVG/image charts anywhere in the deliverable; evidence that would have been a chart is a compact markdown table or is dropped. The only images are the two variant snapshots.
@@ -64,9 +64,9 @@ Measured against the randomized holdout, per user (window: since 31 May):
 
 The window since 22 July is the better guide to what the converged system delivers today. The monthly figure derives from roughly 33,000 optimized users per month at August traffic multiplied by the measured gain of 1.0 to 1.4 percentage points; the confidence intervals allow roughly 130 to 780. Traffic is seasonal: July volumes ahead of the filing deadline were about five times higher, and the same lift is worth proportionally more whenever traffic returns to those levels.
 
-**Modeled estimates.** These are the model's forward-looking view and correspond to the *Lift (now)* and *Lift (best variant)* cards on the dashboard's Model tab:
+**Modeled estimates.** These are the model's forward-looking view, the *Lift (now)* and *Lift (best variant)* figures:
 
-| Estimate | Lift | 95% interval |
+| Estimate | Lift | Interval |
 |---|---|---|
 | Current policy vs. original screen | +5.9% | [+5.2%, +6.6%] |
 | Best variant (ceiling) vs. original screen | +5.9% | [+5.2%, +6.6%] |
@@ -101,9 +101,9 @@ The original screen received a thorough test: more exposures than any variant ex
 
 Snapshots of [all 70 variants are available on the dashboard](https://app.levered.dev/optimizations/<optimization-id>#results).
 
-**Factor-level utilities** (average effect on sign-up rate vs. the original level; model estimates):
+**Level effects** (effect on sign-up rate vs. the original level, with the other elements as the model currently serves them; model estimates):
 
-| Factor | Level | Utility |
+| Factor | Level | Effect |
 |---|---|---|
 | Button label | continue_with | **+1.05pp** |
 | | sign_up_with *(original)* | 0 |
@@ -161,7 +161,7 @@ Sign-up rates are higher on iOS in both arms, and the lift shows no detectable d
 
 **What context added: no personalization benefit has been detected.**
 
-- The model finds no platform effect on which variant wins (context importance 0.00, *model estimate*), and it serves variant 67 to 99% of traffic on both platforms.
+- The model finds no platform effect on which variant wins: personalizing on platform has added +0.0% so far, conditioning on it is worth +0.0% (*model estimates*), and the model serves variant 67 to 99% of traffic on both platforms.
 - The observed data agree: among the four variants with enough users on both platforms, the same one leads on each, and there is no evidence that any variant performs differently by platform (day-controlled test: F(3, 139,870) = 0.62, p = 0.60). This comparison is a cross-check and is not randomized.
 - An optimization without the platform factor would therefore most likely have reached the same design.
 - Considering a context factor slows learning, because the model has to learn each level separately. Platform can be left out of the next optimization.

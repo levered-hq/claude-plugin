@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Derive every analyst-layer number a results report needs from one
-`levered optimizations report-data <id> --json` pack. Stdlib only.
+`levered optimizations report-data <id>` pack. Stdlib only.
 
 Usage:
     levered optimizations report-data <id> > pack.json
@@ -10,11 +10,15 @@ Sections printed: CONFIG (with a config hash for update-mode comparisons),
 VALIDATION (holdout share by day, enrollment reconciliation, baseline-sanity
 gate), MEASURED (published + windowed recomputes on the same estimand),
 GUARDRAILS, MODELED, VARIANTS, OUTCOME MIX (with monthly translation),
-FACTOR UTILITIES, INTERACTIONS (day-controlled F-test + full deviation
-matrix), CONTEXT (measured lift per context level, winner per level, and the
-value personalization added over the single best variant; printed only when
-the model has context factors). Every derived figure is labeled with its basis so the report writer
-never has to re-derive one with ad hoc warehouse SQL.
+FACTOR EFFECTS (FACTOR UTILITIES for older optimizations), INTERACTIONS (day-controlled F-test + full deviation
+matrix), CONTEXT (the model's per-context figures, measured lift per context
+level, winner per level, and the value personalization added over the single
+best variant; printed only when the model has context factors). Model figures
+come from the pack's `model` block (null before the model has an estimate) and
+their trend from `model_history`: the posterior store's, or, for an
+optimization that predates the store (`model.source == "bandit"`,
+LEGACY(model-source)), bandit's own. Every derived figure is labeled with its basis so the report
+writer never has to re-derive one with ad hoc warehouse SQL.
 """
 
 import argparse
@@ -29,6 +33,21 @@ NONE_KEYS = {"__none__"}
 
 def fmt_pct(x, digits=2):
     return f"{'+' if x >= 0 else ''}{x * 100:.{digits}f}%"
+
+
+def fmt_iv(iv, digits=2):
+    """A {lo, mid, hi} lift from the model block: median [interval]."""
+    if not iv:
+        return "no estimate"
+    return f"{fmt_pct(iv['mid'], digits)} [{fmt_pct(iv['lo'], digits)}, {fmt_pct(iv['hi'], digits)}]"
+
+
+def fmt_imp(iv, kind):
+    """An importance entry: a lift ("worth +x%"), or, for importance of kind
+    'share', a share of the reward's variance."""
+    if kind == "share":  # LEGACY(model-source): bandit's variance shares.
+        return f"share {iv['mid']:.3f} [{iv['lo']:.3f}, {iv['hi']:.3f}]" if iv else "no estimate"
+    return f"worth {fmt_iv(iv)}"
 
 
 def level_values(factor):
@@ -197,16 +216,57 @@ def variant_label(raw):
 MIN_CELL_USERS = 200
 
 
-def context_section(rows, context_factors, results, value_of, since):
-    """Everything the report's Context block needs, per context factor:
-    measured lift by level, the winner by level, the variant × context test,
-    and the value of personalizing over serving the single best variant."""
-    print("\n== CONTEXT (cube basis; context = value at first exposure) ==")
-    for imp in results.get("context_importance") or []:
+def model_context(model, labels):
+    """The model's own per-context figures: what each context factor is
+    worth, what personalizing has added so far, and what the model serves in
+    each segment. `labels` maps variant keys to names."""
+    if not model:
+        print("no modeled context figures (see MODELED)")
+        return
+    legacy = (model.get("importance") or {}).get("kind") == "share"  # LEGACY(model-source)
+    for f, iv in ((model.get("importance") or {}).get("context") or {}).items():
         print(
-            f"model context importance {imp.get('factor')}: mean {imp.get('mean') or 0:.3f} "
-            f"(lo {imp.get('lo') or 0:.3f}, hi {imp.get('hi') or 0:.3f})  [model estimate]"
+            f"context importance {f}: worth {fmt_iv(iv)}  [model estimate; oracle lift"
+            f"{'; design importance is a share, not comparable' if legacy else '; not on the design factor effects scale'}]"
         )
+    pers = model.get("personalization")
+    if pers:
+        print(
+            f"personalization (contextual policy vs the same policy blind to context): {fmt_iv(pers['lift'])}, "
+            f"P(> 0) = {pers['p_positive']:.2f}  [model estimate]"
+        )
+    elif model.get("source") == "bandit":  # LEGACY(model-source)
+        print("personalization: no model figure (the optimization predates the posterior store); lead with context importance")
+
+    def reward(x):
+        return f"{x['mid']:.4g}" if x else "n/a"
+
+    segments = model.get("segments") or []
+    if segments:
+        print("segments (one per full context; weight = share of traffic):")
+        for s in segments:
+            # LEGACY(model-source): a 'bandit' segment carries rewards only.
+            lift = (
+                f"  policy lift {fmt_iv(s.get('policy_lift'))}  P(beats ref) {s['p_beats_reference']:.2f}"
+                if s.get("p_beats_reference") is not None else ""
+            )
+            serves = (
+                f"  serves {labels.get(s['leader'], s['leader'])} at {s['leader_share'] * 100:.0f}%"
+                if s.get("leader") else ""
+            )
+            print(
+                f"  {s['context_key']:<34} weight {(s.get('weight') or 0) * 100:4.1f}%{lift}  "
+                f"reward {reward(s.get('policy_reward'))} of ceiling {reward(s.get('ceiling_reward'))}{serves}"
+            )
+
+
+def context_section(rows, context_factors, model, labels, value_of, since):
+    """Everything the report's Context block needs, per context factor:
+    the model's figures, measured lift by level, the winner by level, the
+    variant × context test, and the value of personalizing over serving the
+    single best variant."""
+    print("\n== CONTEXT (model figures, then cube basis; context = value at first exposure) ==")
+    model_context(model, labels)
 
     for cf in context_factors:
         levels = sorted({(r.get("context") or {}).get(cf, "") for r in rows})
@@ -382,12 +442,21 @@ def main():
     hd = pack.get("holdout_daily", {})
     mix = pack.get("outcome_mix", {})
     guardrails = pack.get("guardrails", {})
-    lift_hist = pack.get("policy_lift_history", {})
 
-    for key in ("results", "holdout_daily", "outcome_mix", "guardrails", "policy_lift_history"):
+    for key in ("results", "model", "model_history", "holdout_daily", "outcome_mix", "guardrails"):
         err = (pack.get(key) or {}).get("error") or (pack.get(key) or {}).get("warehouse_error")
         if err:
             print(f"!! surface '{key}' unavailable: {err}")
+    # None before the model has an estimate.
+    model_err = (pack.get("model") or {}).get("error")
+    model = None if model_err else pack.get("model")
+    modeled = {v["variant_key"]: v for v in (model or {}).get("variants") or []}
+
+    def reward_mid(v):
+        return ((modeled.get(v.get("variant_key")) or {}).get("reward") or {}).get("mid")
+
+    def share_of(v):
+        return (modeled.get(v.get("variant_key")) or {}).get("share")
 
     # ── CONFIG ────────────────────────────────────────────────────────────
     factors = (model_config.get("design_factors") or [])
@@ -456,17 +525,15 @@ def main():
 
     # Baseline sanity (SKILL step 4c): model's baseline arm vs recent holdout mean.
     variants = results.get("variants") or []
-    # Baseline = every factor at its index-0 level → variant number 1 by convention.
-    baseline_v = next((v for v in variants if v.get("number") == 1), None)
-    stats = results.get("stats") or {}
+    baseline_v = next((v for v in variants if v.get("is_baseline")), None)
     recent_days = days[-3:]
     rh_n = sum(r["users"] for r in rows if arm_of(r) == "holdout" and r["day"] in recent_days)
     rh_v = sum(r["users"] * value_of(r["outcome_key"]) for r in rows if arm_of(r) == "holdout" and r["day"] in recent_days)
-    if baseline_v and rh_n:
-        bm = baseline_v.get("expected_reward_mean")
+    bm = reward_mid(baseline_v) if baseline_v else None
+    if bm is not None and rh_n and model and model.get("policy_lift"):
         hold_recent = rh_v / rh_n
-        modeled_lift_abs = (stats.get("estimated_improvement_percent") or 0.0) / 100.0 * (bm or 1)
-        gap = abs((bm or 0) - hold_recent)
+        modeled_lift_abs = model["policy_lift"]["mid"] * bm
+        gap = abs(bm - hold_recent)
         frac = gap / modeled_lift_abs if modeled_lift_abs else float("inf")
         verdict = "PASS (modeled figures may present normally)" if frac < 0.35 else "FAIL (stale-baseline caveat required; keep modeled out of Summary)"
         print(
@@ -493,8 +560,8 @@ def main():
     leader_share_by_day = {}
     ts = results.get("time_series") or []
     top_variant_key = None
-    if variants:
-        top_variant_key = max(variants, key=lambda v: v.get("weight") or 0).get("variant_key")
+    if modeled:
+        top_variant_key = max(modeled.values(), key=lambda v: v.get("share") or 0)["variant_key"]
     for point in ts:
         vv = point.get("variants") or {}
         tot = sum(x.get("exposures", 0) for x in vv.values())
@@ -542,26 +609,46 @@ def main():
         print(f"  {json.dumps(g, default=str)[:400]}")
 
     # ── MODELED ───────────────────────────────────────────────────────────
-    print("\n== MODELED (label as model estimates; dashboard Model tab cards) ==")
-    ii = stats.get("estimated_improvement_interval") or [None, None]
-    bi = stats.get("best_vs_baseline_interval") or [None, None]
-    if stats:
-        print(f"Lift (now, policy): {fmt_pct((stats.get('estimated_improvement_percent') or 0) / 100)}  [{ii[0]:.2f}%, {ii[1]:.2f}%]")
-        print(f"Lift (best variant, ceiling): {fmt_pct((stats.get('best_vs_baseline_percent') or 0) / 100)}  [{bi[0]:.2f}%, {bi[1]:.2f}%]")
-        print(f"progress to best: {(stats.get('estimated_progress') or 0) * 100:.0f}%")
-    for drow in (lift_hist.get("daily") or [])[-5:]:
-        print(f"  lift-history {json.dumps(drow, default=str)[:200]}")
+    reference = (results.get("stats") or {}).get("reference") or "baseline"
+    print(f"\n== MODELED (label as model estimates; lifts vs the {reference.replace('_', ' ')}) ==")
+    if model:
+        if model.get("source") == "bandit":  # LEGACY(model-source)
+            print("source: bandit's own figures (the optimization predates the posterior store)")
+        else:
+            print(f"source: posterior store, version {model.get('model_version')}")
+        p_beats = model.get("p_beats_reference")
+        print(f"Lift (now, policy): {fmt_iv(model.get('policy_lift'))}")
+        print(f"Lift (best variant, ceiling; shrunk halfway toward the policy): {fmt_iv(model.get('ceiling_lift'))}")
+        print(f"P(policy beats the {reference.replace('_', ' ')}): {'n/a' if p_beats is None else f'{p_beats:.3f}'}")
+        print(f"progress to best: {(model.get('progress') or 0) * 100:.0f}%")
+        history = (pack.get("model_history") or {}).get("daily") or []
+        if history:
+            print(f"trend (one point per day, last {min(5, len(history))} of {len(history)}; the stale-baseline symptom check):")
+        for d in history[-5:]:
+            pb = d.get("p_beats_reference")
+            print(
+                f"  {d.get('date')}  policy {fmt_iv(d.get('policy_lift'))}  ceiling {fmt_iv(d.get('ceiling_lift'))}  "
+                f"P(beats) {'n/a' if pb is None else f'{pb:.2f}'}"
+            )
+    else:
+        print(
+            f"model figures unavailable: {model_err}" if model_err
+            else "no model estimate yet: traffic splits evenly over the servable variants"
+        )
 
     # ── VARIANTS ──────────────────────────────────────────────────────────
     print("\n== VARIANTS (rates are lifetime per-exposure; not comparable to windowed lift) ==")
     holdout_frac = (o.get("holdout_percentage") or 0) / 100.0
-    for v in sorted(variants, key=lambda x: -(x.get("expected_reward_mean") or 0)):
-        share_opt = (v.get("weight") or 0) / (1 - holdout_frac) if holdout_frac < 1 else 0
+    for v in sorted(variants, key=lambda x: -(reward_mid(x) or 0)):
+        r = (modeled.get(v.get("variant_key")) or {}).get("reward")
+        modeled_txt = (
+            f"E[r]={r['mid']:.4g} [{r['lo']:.4g},{r['hi']:.4g}]  P(best)=traffic(opt)={share_of(v) * 100:.1f}%  "
+            f"served weight={share_of(v) * (1 - holdout_frac) * 100:.1f}%"
+            if r else "no model estimate"
+        )
         print(
-            f"  #{v.get('number')}  {json.dumps(v.get('variant'))}  exposures={v.get('exposures')}  "
-            f"rate={v.get('rate'):.4g}  E[r]={v.get('expected_reward_mean'):.4g} "
-            f"[{v.get('expected_reward_lo'):.4g},{v.get('expected_reward_hi'):.4g}]  "
-            f"P(best)={v.get('prob_best'):.3f}  traffic(opt)={share_opt * 100:.1f}%"
+            f"  #{v.get('number')}  {json.dumps(v.get('variant'))}{'  (baseline)' if v.get('is_baseline') else ''}  "
+            f"exposures={v.get('exposures')}  rate={v.get('rate'):.4g}  {modeled_txt}"
         )
 
     # ── OUTCOME MIX ───────────────────────────────────────────────────────
@@ -598,33 +685,67 @@ def main():
         per_day = opt_recent / len(recent)
         print(f"traffic: ~{per_day:.0f} optimized users/day over the last {len(recent)} full days → ~{per_day * 30:,.0f}/month (for the absolute translation)")
 
-    # ── FACTOR UTILITIES (model estimates) ────────────────────────────────
-    print("\n== FACTOR UTILITIES (model estimates: mean E[r] over other factors, vs level 0) ==")
-    for imp in results.get("factor_importance") or []:
-        print(f"  importance {imp.get('factor')}: {imp.get('mean'):.3f} (q1 {imp.get('q1'):.3f}, q3 {imp.get('q3'):.3f}, kind {imp.get('kind')})")
+    # ── FACTOR EFFECTS (model estimates) ──────────────────────────────────
+    importance = (model or {}).get("importance") or {}
+    factor_effects = (model or {}).get("factor_effects")
+    design_imp = importance.get("design") or {}  # LEGACY(model-source): bandit's variance shares
     fnames = [f.get("name") for f in factors]
-    if variants and fnames:
-        for f in factors:
-            name, levels = f.get("name"), level_values(f)
-            means = {}
+    if factor_effects is not None:
+        print(
+            "\n== FACTOR EFFECTS (model estimates; the dashboard's figures: each level vs the reference level, "
+            "the other factors mixed the way the current policy serves them) =="
+        )
+        for fe in factor_effects:
+            name = fe.get("factor")
+            print(
+                f"  factor effect {name}: worth {fmt_iv(fe.get('relative'))}  (every segment taking its own best level "
+                "vs the reference level; never negative and biased upward under uncertainty, so a factor with no effect "
+                "still reads slightly positive)"
+            )
+            levels = sorted(fe.get("levels") or [], key=lambda lv: -(((lv.get("relative") or {}).get("mid")) or 0))
             for lv in levels:
-                vs = [v.get("expected_reward_mean") for v in variants if str((v.get("variant") or {}).get(name)) == lv]
-                if vs:
-                    means[lv] = sum(vs) / len(vs)
-            if means and levels and levels[0] in means:
-                base = means[levels[0]]
+                eff, rel = lv.get("effect"), lv.get("relative")
+                abs_txt = f"  abs {eff['mid']:+.4g} [{eff['lo']:+.4g}, {eff['hi']:+.4g}]" if eff else ""
+                print(f"    {name}={str(lv.get('value')):<20} {fmt_iv(rel)}{abs_txt}")
+        ranked = [fe.get("factor") for fe in factor_effects]  # the pack ranks them by the median factor effect
+    else:
+        print("\n== FACTOR UTILITIES (model estimates: mean E[r] over other factors, vs level 0) ==")
+        if importance.get("kind") == "share":
+            # LEGACY(model-source): bandit's design importance.
+            for f, iv in sorted(design_imp.items(), key=lambda kv: -((kv[1] or {}).get("mid") or 0)):
+                print(
+                    f"  importance {f}: {fmt_imp(iv, 'share')}  (share of the reward's variance its main effect "
+                    "carries; with the interaction share they sum to 1; not a lift)"
+                )
+        if modeled and fnames:
+            for f in factors:
+                name, levels = f.get("name"), level_values(f)
+                means = {}
                 for lv in levels:
-                    if lv in means:
-                        print(f"  {name}={lv:<20} {means[lv]:.4g}  ({fmt_pct((means[lv] - base) / base)} vs level 0)")
+                    vs = [reward_mid(v) for v in variants if str((v.get("variant") or {}).get(name)) == lv and reward_mid(v) is not None]
+                    if vs:
+                        means[lv] = sum(vs) / len(vs)
+                if means and levels and levels[0] in means:
+                    base = means[levels[0]]
+                    for lv in levels:
+                        if lv in means:
+                            print(f"  {name}={lv:<20} {means[lv]:.4g}  ({fmt_pct((means[lv] - base) / base)} vs level 0)")
+        ranked = sorted(design_imp, key=lambda f: -((design_imp[f] or {}).get("mid") or 0))
 
     # ── INTERACTIONS (cube basis, optimized arm, day-controlled) ──────────
-    ia = results.get("interaction_importance") or {}
-    if ia:
-        print(f"\n== INTERACTIONS ==\nmodel interaction importance: mean {ia.get('mean'):.3f} (q1 {ia.get('q1'):.3f}, q3 {ia.get('q3'):.3f})")
+    if importance.get("interaction"):
+        print(
+            f"\n== INTERACTIONS ==\nmodel interaction{' importance' if importance.get('kind') == 'share' else ''}: {fmt_imp(importance['interaction'], importance.get('kind') or 'lift')}  "
+            + (
+                # LEGACY(model-source)
+                "(share of the reward's variance no main effect explains on its own; same scale as factor importance)"
+                if importance.get("kind") == "share"
+                else "(the best design over each factor's best level picked on its own, as the factor effects pick it; near zero = no interaction)"
+            )
+        )
     if len(fnames) >= 2 and rows:
-        imp_sorted = sorted(results.get("factor_importance") or [], key=lambda x: -(x.get("mean") or 0))
-        fa = imp_sorted[0]["factor"] if imp_sorted else fnames[0]
-        fb = imp_sorted[1]["factor"] if len(imp_sorted) > 1 else fnames[1]
+        fa = ranked[0] if ranked else fnames[0]
+        fb = ranked[1] if len(ranked) > 1 else next(f for f in fnames if f != fa)
         la = next((level_values(f) for f in factors if f.get("name") == fa), [])
         lb = next((level_values(f) for f in factors if f.get("name") == fb), [])
         cells = defaultdict(lambda: defaultdict(int))  # (day, a, b) -> outcome -> users
@@ -704,13 +825,13 @@ def main():
     # ── CONTEXT (cube basis) ──────────────────────────────────────────────
     context_factors = mix.get("context_factors") or []
     configured_context = [f.get("name") for f in (model_config.get("context_factors") or [])]
+    labels = {v.get("variant_key"): f"#{v.get('number')} {variant_label(json.dumps(v.get('variant')))}" for v in variants}
     if context_factors and any(r.get("context") for r in rows):
-        context_section(rows, context_factors, results, value_of, since)
+        context_section(rows, context_factors, model, labels, value_of, since)
     elif configured_context:
         print(f"\n== CONTEXT ==\nmodel has context factors {configured_context} but the cube carries no context dimension")
-        for imp in results.get("context_importance") or []:
-            print(f"model context importance {imp.get('factor')}: mean {imp.get('mean') or 0:.3f}  [model estimate]")
-        print("(per-context figures unavailable from this pack; report the model's context importance only)")
+        model_context(model, labels)
+        print("(no measured per-level lift or empirical cross-check from this pack; report the model's figures only)")
 
     print("\nBases reminder: published/holdout_daily figures share the platform estimand (weight of first in-window matched")
     print("outcome per user); the cube's mix shares are user counts on the same attribution. Variant rates are per exposure.")

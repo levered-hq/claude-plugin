@@ -2,17 +2,17 @@
 
 The platform doesn't publish interaction metrics, so deriving them is the analyst's own work — and the part of the report most likely to go confidently wrong. Two methods (screen, then test) and two interpretation traps that have each produced a plausible-but-false narrative in real reports.
 
-This file covers **design×design**. Context×design ("wins for new users, loses for retained users") is led by the model (context importance today, per-context posteriors once #333 ships), with the script's CONTEXT section as the empirical cross-check under the same rules as here: the day-controlled test gates every claim, |z| < 2 is *directional*, and a pattern claim ships with its full evidence. The cross-check is not randomized (allocation inside the optimized arm is adaptive), so it supports a claim and never carries one alone. Lift per context level against the holdout is randomized and always measured.
+This file covers **design×design**. Context×design ("wins for new users, loses for retained users") is led by the model (the pack's personalization lift, per-segment figures and context importance), with the script's CONTEXT section as the empirical cross-check under the same rules as here: the day-controlled test gates every claim, |z| < 2 is *directional*, and a pattern claim ships with its full evidence. The cross-check is not randomized (allocation inside the optimized arm is adaptive), so it supports a claim and never carries one alone. Lift per context level against the holdout is randomized and always measured.
 
 ## Method 1 — screen from the posterior means
 
-From `results` (or `models state`), using per-variant point estimates:
+From the pack's `model.variants`, using each variant's `reward.mid`:
 
 ```
 interaction(A=a, B=b) = mean(variants with A=a,B=b) − mean(A=a) − mean(B=b) + grand_mean
 ```
 
-This is double-centered, cheap, and has **no honest uncertainty estimate** — `models state` exposes interval summaries, not draw-aligned samples. Treat it strictly as a *screen*: flag terms that are large relative to the factors' main-effect spreads, and say explicitly they're point estimates. Note also that late in a run these means are the model's shrunken estimates, heavily informed by whatever the bandit still serves — thin cells are model extrapolation, not data.
+This is double-centered, cheap, and has **no honest uncertainty estimate** — the pack carries interval summaries, not draw-aligned samples (those are in the posterior store's `posterior_reward`, a `levered posterior query` away). Treat it strictly as a *screen*: flag terms that are large relative to the factors' main-effect spreads, and say explicitly they're point estimates. Note also that late in a run these means are the model's shrunken estimates, heavily informed by whatever the bandit still serves — thin cells are model extrapolation, not data.
 
 ## Method 2 — test on raw data
 

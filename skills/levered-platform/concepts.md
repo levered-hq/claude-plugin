@@ -34,7 +34,7 @@ Good designs pick factors where *each* factor is plausibly worth testing on its 
 Attributes about the user/session that the model uses to personalize variant selection. Examples: `device`, `country`, `time_of_day`. When context factors are provided, the model learns which variants work best for which contexts (true contextual bandit).
 
 ### Model Type: CMAB
-Contextual Multi-Armed Bandit. Uses Thompson Sampling with Bayesian logistic regression. The model maintains a posterior distribution over variant effectiveness and samples from it to balance exploration (trying different variants) and exploitation (showing the best).
+Contextual Multi-Armed Bandit. Uses Thompson Sampling with a Bayesian factorization machine. The model maintains a posterior distribution over variant effectiveness and samples from it to balance exploration (trying different variants) and exploitation (showing the best).
 
 ### Reward
 The success signal. Usually binary (bool) — did the user convert? Can also be numeric. Defined by a warehouse metric that queries your data warehouse.
@@ -49,7 +49,7 @@ Levered connects to BigQuery, Snowflake, or Postgres to pull exposure/reward dat
 Each time a variant is served to a user, that's an exposure. Exposures are logged and joined with rewards for model training.
 
 ### Lift
-The improvement in conversion rate that Levered's optimization provides over random/uniform assignment. Shown as a percentage with confidence intervals.
+The improvement Levered's optimization provides over the reference: the baseline variant, or an even split of traffic across the variants when there is none. Measured lift (against the randomized holdout) comes with a confidence interval; the model's lifts come as a median with a credible interval.
 
 ### Baseline
 The variant that is the current experience: by default the one with every factor at its first level (`--baseline` names another). Lift is measured against it and the holdout serves it. This is `--control variant`, the default. Two other control types exist. `--control external`: the holdout keeps a version that is none of the variants (e.g. a legacy component); a holdout is required, holdout users never train the model, and lift against the current version comes from the holdout comparison. `--control none` (or `--no-baseline`): every variant is new — a new screen, a CRM-triggered flow — and nothing existed before. Then there is no holdout and no guardrails. Without a baseline variant (`external` or `none`), the dashboard reports model lift against an even split of traffic across the variants (what picking one at random would earn). The results API says which applies: `stats.reference` is `"baseline"` or `"equal_split"`, and each variant carries `is_baseline`. An existing optimization can switch with `levered optimizations update <id> --no-baseline` (or back with `--baseline`); removing a variant baseline requires a zero holdout and no guardrails. External controls can only be set or removed on a draft, and `--no-baseline` keeps an existing external control.
@@ -71,4 +71,4 @@ The API call that returns the best variant for a given user. The model uses Thom
 - Model retrains automatically as new data arrives
 - Serve latency: ~50ms p95
 - SDK has a 2s timeout with graceful fallback
-- Lift is reported with 95% confidence intervals
+- Measured lift is reported with a 95% confidence interval; model figures with a credible interval
