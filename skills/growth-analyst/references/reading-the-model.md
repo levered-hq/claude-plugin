@@ -10,15 +10,11 @@ Every model figure comes from the posterior store: thousands of joint draws from
 
 The reference variant is the index-0 level of every factor. Lift for any variant is `(p_variant − p_baseline) / p_baseline`. This is why the baseline level is never pruned — it's the measurement anchor. Levered also forces traffic to the baseline (the holdout is served the baseline), so it stays well-measured even when the bandit's own weight on it reaches zero.
 
-The API, not the key convention, says which variant that is: each variant in `results` carries `is_baseline`, and `results.stats.reference` says what every lift figure is measured against — `"baseline"`, `"equal_split"` for an optimization created without one (`control_type: none`), or `"holdout"` when the holdout keeps a version that is none of the variants (`control_type: external`).
+The API, not the key convention, says which variant that is: each variant in `results` carries `is_baseline`, and `results.stats.reference` says what every lift figure is measured against — `"baseline"` or, for an optimization created without one (`has_baseline: false`), `"equal_split"`.
 
 ## No baseline = even split
 
 A brand-new experience (a new screen, a CRM-triggered flow) has no "what users saw before", so it is created without a baseline: no variant is the original, there is no holdout, and `primary_metric_vs_holdout` is empty. The model then measures the policy against an **even split of traffic across the servable variants** — the counterfactual of picking one at random — on the same posterior draws: `model.policy_lift` is policy vs. even split, `model.ceiling_lift` is the best variant vs. even split, `model.p_beats_reference` is P(policy beats the even split), and `model.progress` is how far the allocation has moved from that split toward the best variant. These are the only lift figures such an optimization has, so they lead — labeled as model estimates, with the reference named. The stale-baseline trap below does not apply: there is no baseline arm to go stale.
-
-## External control = measured holdout
-
-With `control_type: external` the holdout keeps the current version, which is none of the variants, so the model has no estimate of it. `model.policy_lift`, `model.ceiling_lift` and `model.p_beats_reference` then compare the model's reward with the reward **measured in the holdout** (settled holdout users up to the model version's day, with its sampling error in the interval). `model.progress` still measures against an even split: it is how far the allocation has moved toward the best variant, not a gain over the holdout. Segment lifts are null, because the holdout is not measured per segment. The policy lift is still a model estimate of today's split; the holdout test is the measurement over the whole runtime.
 
 ## Traffic share IS P(best)
 
@@ -92,7 +88,7 @@ These lead the "what context added" claim. A different `leader` by segment with 
 
 ## Asking the store directly
 
-The pack is fixed queries over the store. Anything else is a `levered posterior query <id> --sql … --json`; pass the SQL through a quoted heredoc as below, so the shell leaves its quotes and `$params` alone. The response is `{columns, rows, model_version, available_versions, n_samples, …}`. Views and macros: `posterior_reward(variant_id, context_id, sample_id, reward)`, `variants`, `contexts(…, weight)`, the policies `thompson_policy` / `thompson_policy_marginal` / `baseline_policy`, `thompson_traffic_share`, the per-draw macros `lift_draws[_by_context](pol)` (against the optimization's lift reference, the measured holdout for external control), `policy_draws[_by_context](pol, alt)`, `variant_draws[_by_context](alt)`, `oracle_draws[_by_context](context_factors, design_factors)`, `interaction_draws[_by_context]`, `factor_draws[_by_context](factor)`, and the reducers `dist(x, q)` and `p_gt(x, t)`. Use the pack's conventions: quantiles `[0.025, 0.5, 0.975]`, median as the estimate, and one oracle restriction per query (two can exceed memory on large models). Design factors are read with `factor_draws`, not an oracle restriction.
+The pack is fixed queries over the store. Anything else is a `levered posterior query <id> --sql … --json`; pass the SQL through a quoted heredoc as below, so the shell leaves its quotes and `$params` alone. The response is `{columns, rows, model_version, available_versions, n_samples, …}`. Views and macros: `posterior_reward(variant_id, context_id, sample_id, reward)`, `variants`, `contexts(…, weight)`, the policies `thompson_policy` / `thompson_policy_marginal` / `baseline_policy`, `thompson_traffic_share`, the per-draw macros `policy_draws[_by_context](pol, alt)`, `variant_draws[_by_context](alt)`, `oracle_draws[_by_context](context_factors, design_factors)`, `interaction_draws[_by_context]`, `factor_draws[_by_context](factor)`, and the reducers `dist(x, q)` and `p_gt(x, t)`. Use the pack's conventions: quantiles `[0.025, 0.5, 0.975]`, median as the estimate, and one oracle restriction per query (two can exceed memory on large models). Design factors are read with `factor_draws`, not an oracle restriction.
 
 Trend of the headline: `levered optimizations lift-history <id> [--days N]` prints it one point per day (each day's newest version). The same figures for any set of versions: run this once per version in `available_versions`, passing `--version`, and tabulate.
 
@@ -101,7 +97,7 @@ levered posterior query <id> --version <v> --json --sql "$(cat <<'SQL'
 SELECT quantile_cont(lift, [0.025, 0.5, 0.975]) AS policy_lift,
        quantile_cont((lift + headroom_lift) / 2, [0.025, 0.5, 0.975]) AS ceiling_lift,
        avg((lift > 0)::DOUBLE) AS p_beats_reference
-FROM lift_draws('thompson_policy')
+FROM policy_draws('thompson_policy', 'baseline_policy')
 SQL
 )"
 ```
