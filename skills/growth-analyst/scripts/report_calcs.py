@@ -223,12 +223,20 @@ def model_context(model, labels):
     if not model:
         print("no modeled context figures (see MODELED)")
         return
-    legacy = (model.get("importance") or {}).get("kind") == "share"  # LEGACY(model-source)
-    for f, iv in ((model.get("importance") or {}).get("context") or {}).items():
-        print(
-            f"context importance {f}: worth {fmt_iv(iv)}  [model estimate; oracle lift"
-            f"{'; design importance is a share, not comparable' if legacy else '; not on the design factor effects scale'}]"
-        )
+    split = model.get("context_importance")
+    if split:
+        def share(t):
+            return f"{t['share']:.0%} of the personalization uplift" if t.get("share") is not None else "no share (no positive personalization uplift)"
+        for t in split["factors"]:
+            print(f"context uplift {t['factor']}: {fmt_iv(t['uplift'])}; {share(t)}  [model estimate; not comparable with design factors]")
+        print(f"context interaction term: {fmt_iv(split['interaction']['uplift'])}; {share(split['interaction'])}  [model estimate]")
+    else:  # LEGACY(model-source)
+        legacy = (model.get("importance") or {}).get("kind") == "share"
+        for f, iv in ((model.get("importance") or {}).get("context") or {}).items():
+            print(
+                f"context importance {f}: worth {fmt_iv(iv)}  [model estimate; "
+                f"{'oracle lift; design importance is a share, not comparable' if legacy else 'not comparable with factor effects'}]"
+            )
     pers = model.get("personalization")
     if pers:
         print(
@@ -708,6 +716,18 @@ def main():
                 abs_txt = f"  abs {eff['mid']:+.4g} [{eff['lo']:+.4g}, {eff['hi']:+.4g}]" if eff else ""
                 print(f"    {name}={str(lv.get('value')):<20} {fmt_iv(rel)}{abs_txt}")
         ranked = [fe.get("factor") for fe in factor_effects]  # the pack ranks them by the median factor effect
+        split = (model or {}).get("factor_importance")
+        if split:
+            print(
+                "\n== FACTOR IMPORTANCE (model estimates: the policy lift split by design factor; each factor's "
+                "level effects weighted by the policy's traffic on each level, and the interaction term that the "
+                "product of the factor uplifts leaves; shares sum to 1) =="
+            )
+            terms = [(t.get("factor"), t) for t in split.get("factors") or []] + [("interaction term", split.get("interaction") or {})]
+            for name, t in terms:
+                share = t.get("share")
+                share_txt = f"  {share * 100:.0f}% of the policy lift" if share is not None else ""
+                print(f"  {str(name):<24} uplift {fmt_iv(t.get('uplift'))}{share_txt}")
     else:
         print("\n== FACTOR UTILITIES (model estimates: mean E[r] over other factors, vs level 0) ==")
         if importance.get("kind") == "share":

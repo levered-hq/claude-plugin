@@ -12,7 +12,7 @@ From the pack's `model.variants`, using each variant's `reward.mid`:
 interaction(A=a, B=b) = mean(variants with A=a,B=b) − mean(A=a) − mean(B=b) + grand_mean
 ```
 
-This is double-centered, cheap, and has **no honest uncertainty estimate** — the pack carries interval summaries, not draw-aligned samples (those are in the posterior store's `posterior_reward`, a `levered posterior query` away). Treat it strictly as a *screen*: flag terms that are large relative to the factors' main-effect spreads, and say explicitly they're point estimates. Note also that late in a run these means are the model's shrunken estimates, heavily informed by whatever the bandit still serves — thin cells are model extrapolation, not data.
+This is double-centered, cheap, and has **no honest uncertainty estimate** — the pack carries interval summaries, not draw-aligned samples (those are in the posterior store, a `levered posterior query` away). Treat it strictly as a *screen*: flag terms that are large relative to the factors' main-effect spreads, and say explicitly they're point estimates. Note also that late in a run these means are the model's shrunken estimates, heavily informed by whatever the bandit still serves — thin cells are model extrapolation, not data.
 
 ## Method 2 — test on raw data
 

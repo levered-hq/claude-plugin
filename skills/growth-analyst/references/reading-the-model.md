@@ -73,67 +73,34 @@ Design factors and context factors answer "what is this worth?" with two differe
 
 `relative` is the lift ("worth +x%"), `effect` the absolute reward difference (pp for a rate). The factor effect picks a best level over uncertain rewards, so it is biased upward: a factor with no effect still reads slightly positive. Check a factor effect whose interval starts near zero against the level effects and the exposure counts before calling the factor important; low means little to gain from optimizing it, so the factor is a candidate to drop in the next optimization. The level effects are the dashboard's per-level figures: quote them for the level-effects table, and do not re-derive them from `model.variants` (an equal-weight mean over the other factors is a different, unmixed figure).
 
-**The interaction** (`model.importance.interaction`, `lift` of `interaction_draws`): the best design over the design made of each factor's best level, each picked on its own in every segment and draw on its level reward (the other factors mixed the way the current policy serves them, as in `factor_draws`). Only reported with two or more design factors. Near zero means the factors don't interact; when it is as large as the top factor effect, the winner is a specific combination, so don't read factors one at a time.
+**Factor uplift and factor importance** (`model.factor_importance`, from `importance_draws`; only with two or more design factors): the policy lift split by design factor. Each entry in `factors` has an `uplift` (an interval) and a `share`; `interaction` has the same for the interaction term.
 
-**Context factors: importance** (`model.importance.context`), an oracle lift `reward_oracle / reward − 1`: the best the model could do with everything, over the best it could do denied conditioning on that context factor. It is not on the design factor effects' scale: never put "hero is worth +4%" and "platform is worth +1%" side by side as a ranking. None of these figures are shares and none partition anything: never sum them, stack them to 100%, or describe one as a fraction of the total. Two context factors that stand in for each other can both read low while conditioning on either is worth a lot. Both sides of the oracle ratio are best-of-draws figures, so check a narrow interval near zero against the exposure counts before calling a context factor worthless.
+- **Factor uplift:** the factor's level effects weighted by the policy's share of traffic on each level, i.e. what the policy's current choices on that factor earn over its reference level. It is signed, like the policy lift: below 0 when the policy currently does worse on that factor than on its reference level.
+- **Interaction term:** 1 + the policy lift divided by the product of 1 + each factor uplift, minus 1. It is near 0 when the reward and the policy's traffic both factorize across the design factors. A large one means the gain comes from combinations of levels, or from the policy's levels on one factor depending on another.
+- **Share:** a term's expected ln(1 + uplift) over the expected ln(1 + policy lift). The factors and the interaction term sum to 1, so "the CTA accounts for 60% of the current lift" is right. `share` is null when the policy lift isn't expected to be positive; quote the uplifts then. When the control is the current version, the split is of the policy's lift over an even split, not of the lift over the current version: say so if you quote shares next to that lift.
+
+This is the one design figure that partitions anything. It reads what each factor contributes to the policy lift now; the factor effect reads what a factor could be worth. A factor can have a large factor effect and a small share while the policy is still exploring it.
+
+**Context importance** (`model.context_importance`) splits the personalization uplift (`model.personalization`) by context factor, the way factor importance splits the policy lift by design factor:
+
+- **Context-factor uplift** (`uplift`, also `model.importance.context`): the live policy over the same policy with that one factor averaged out (its segments pooled by weight before the policy is taken), still conditioning on the others. Signed.
+- **Interaction term:** what the product of 1 + each uplift leaves of 1 + the personalization uplift. Negative when personalizing pays on factors together (removing any one loses what they earn jointly, so each is credited with it); positive when factors stand in for each other (each uplift small while the personalization uplift is large).
+- **Share:** a term's expected ln(1 + uplift) over the expected ln(1 + personalization uplift); the factors and the interaction term sum to 1, so "device accounts for 60% of what personalizing adds" is right. Null when the personalization uplift isn't expected to be positive; quote the uplifts then.
+
+Design shares are of the policy lift, context shares of the personalization gain: never put a design factor and a context factor side by side as a ranking. Factor importance and context importance are the only figures that partition anything: never sum, stack or apportion the others.
 
 ## Per-context figures
 
 The store models every context (segment) separately, so the pack carries the model's own per-context view:
 
 - `model.segments` — per context (one row per combination of every context factor, `weight` = its share of traffic): the policy lift vs. the reference, P(beats it), the policy's reward against the ceiling's (`ceiling_reward`: the best variant there), and the variant the model serves (`leader`, a variant key; the script labels it) with its share.
-- `model.personalization` — what the contextual policy earns over the same policy blind to context, with P(> 0). This is what considering context has added so far; context importance is what each factor could add.
+- `model.personalization` — what the contextual policy earns over the same policy blind to context, with P(> 0). This is what considering context has added so far; context importance splits it by factor.
 
 These lead the "what context added" claim. A different `leader` by segment with a personalization interval above zero is a personalization benefit; the same leader everywhere with personalization near zero is "no personalization benefit detected so far". Per-level measured lift (cube vs. holdout) stays the basis for "how results varied".
 
 ## Asking the store directly
 
-The pack is fixed queries over the store. Anything else is a `levered posterior query <id> --sql … --json`; pass the SQL through a quoted heredoc as below, so the shell leaves its quotes and `$params` alone. The response is `{columns, rows, model_version, available_versions, n_samples, …}`. Views and macros: `posterior_reward(variant_id, context_id, sample_id, reward)`, `variants`, `contexts(…, weight)`, the policies `thompson_policy` / `thompson_policy_marginal` / `baseline_policy`, `thompson_traffic_share`, the per-draw macros `policy_draws[_by_context](pol, alt)`, `variant_draws[_by_context](alt)`, `oracle_draws[_by_context](context_factors, design_factors)`, `interaction_draws[_by_context]`, `factor_draws[_by_context](factor)`, and the reducers `dist(x, q)` and `p_gt(x, t)`. Use the pack's conventions: quantiles `[0.025, 0.5, 0.975]`, median as the estimate, and one oracle restriction per query (two can exceed memory on large models). Design factors are read with `factor_draws`, not an oracle restriction.
-
-Trend of the headline: `levered optimizations lift-history <id> [--days N]` prints it one point per day (each day's newest version). The same figures for any set of versions: run this once per version in `available_versions`, passing `--version`, and tabulate.
-
-```bash
-levered posterior query <id> --version <v> --json --sql "$(cat <<'SQL'
-SELECT quantile_cont(lift, [0.025, 0.5, 0.975]) AS policy_lift,
-       quantile_cont((lift + headroom_lift) / 2, [0.025, 0.5, 0.975]) AS ceiling_lift,
-       avg((lift > 0)::DOUBLE) AS p_beats_reference
-FROM policy_draws('thompson_policy', 'baseline_policy')
-SQL
-)"
-```
-
-Lift of variant `$b` over variant `$a` in one context (`$context` is a `context_key`, `{}` without context factors):
-
-```bash
-levered posterior query <id> --json \
-  --param q='[0.025,0.5,0.975]' --param 'a={"cta":"lv_cta_0"}' --param 'b={"cta":"lv_cta_1"}' --param 'context={}' \
-  --sql "$(cat <<'SQL'
-WITH a AS (SELECT context_id, variant_id, (variant_key = $a)::DOUBLE AS pi FROM contexts, variants)
-SELECT unnest(dist(d.lift, $q::DOUBLE[])), unnest(p_gt(d.lift, 0))
-FROM variant_draws_by_context('a') d
-JOIN variants v USING (variant_id) JOIN contexts c USING (context_id)
-WHERE v.variant_key = $b AND c.context_key = $context
-SQL
-)"
-```
-
-Design factor `$factor`'s level effects and factor effect in one segment (`$context` is a `context_key`). `factor_draws_by_context` gives per level and draw `reward`, `reward_ref` (the reference), `reward_best`, `lift` (the level effect) and `best_lift` (the factor effect, the same on every level row; in one segment exactly the best level's lift). For all traffic, which is what `model.factor_effects` carries, read `FROM factor_draws($factor)` and drop the join and the `WHERE`. For the absolute difference, reduce `reward - reward_ref`.
-
-```bash
-levered posterior query <id> --json \
-  --param factor=hero --param q='[0.025,0.5,0.975]' --param 'context={"platform":"ios"}' \
-  --sql "$(cat <<'SQL'
-SELECT level,
-       quantile_cont(lift, $q::DOUBLE[]) AS lift,
-       quantile_cont(best_lift, $q::DOUBLE[]) AS best_lift
-FROM factor_draws_by_context($factor) d JOIN contexts c USING (context_id)
-WHERE c.context_key = $context
-GROUP BY level
-SQL
-)"
-```
-
-`level` is the level id inside `variant_key` (e.g. `lv_hero_1`); `model.factor_effects[].levels[].value` carries its name.
+The pack is fixed queries over the store. Anything else is a `levered posterior query <id> --sql … --json`; build it the way the pack's figures are built, so what you quote matches the dashboard. The store describes itself: `duckdb_views()` and `duckdb_functions()` (`WHERE NOT internal`) list its views and macros, each with what it means as `comment`. For the headline's trend, `levered optimizations lift-history <id> [--days N]`.
 
 Before the first posterior is published the route answers 404 ("No posterior has been published for this optimization yet"): traffic is an even split over the servable variants and there is no model estimate.
 

@@ -30,7 +30,7 @@ levered api-keys revoke <id>             # Revoke a key
 ```
 levered optimizations list                                 # List all optimizations
 levered optimizations show <id>                            # Show optimization details
-levered optimizations results <id>                         # Get results: lift, variants, factor and level effects, context importance, interaction (model figures; `model.source` says where from)
+levered optimizations results <id>                         # Get results: lift, variants, factor and level effects, factor importance, context importance (model figures; `model.source` says where from)
 levered optimizations lift-history <id> [--days N]         # The model's policy/ceiling lift, one point per day
 levered optimizations progress <id>                        # Days running, enrollment per arm, progress-to-best/convergence
 levered optimizations guardrails <id>                      # Guardrail metrics: bandit vs. holdout, lift, ok/violated status
