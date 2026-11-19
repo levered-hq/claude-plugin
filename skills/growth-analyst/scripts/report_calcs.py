@@ -35,6 +35,14 @@ def fmt_pct(x, digits=2):
     return f"{'+' if x >= 0 else ''}{x * 100:.{digits}f}%"
 
 
+def fmt_share(t: dict) -> str:
+    """A term's share of the lift it splits (the expected-value share, which
+    sums to 1 over the terms) with the interval of its per-draw share."""
+    iv = t.get("share_interval")
+    spread = f" [{iv['lo']:.0%}, {iv['hi']:.0%}]" if iv else ""
+    return f"{t['share']:.0%}{spread}"
+
+
 def fmt_iv(iv, digits=2):
     """A {lo, mid, hi} lift from the model block: median [interval]."""
     if not iv:
@@ -226,7 +234,7 @@ def model_context(model, labels):
     split = model.get("context_importance")
     if split:
         def share(t):
-            return f"{t['share']:.0%} of the personalization uplift" if t.get("share") is not None else "no share (no positive personalization uplift)"
+            return f"{fmt_share(t)} of the personalization uplift" if t.get("share") is not None else "no share (no personalization uplift)"
         for t in split["factors"]:
             print(f"context uplift {t['factor']}: {fmt_iv(t['uplift'])}; {share(t)}  [model estimate; not comparable with design factors]")
         print(f"context interaction term: {fmt_iv(split['interaction']['uplift'])}; {share(split['interaction'])}  [model estimate]")
@@ -701,7 +709,7 @@ def main():
     if factor_effects is not None:
         print(
             "\n== FACTOR EFFECTS (model estimates; the dashboard's figures: each level vs the reference level, "
-            "the other factors mixed the way the current policy serves them) =="
+            "the other factors mixed the way the current policy mixes them within each level) =="
         )
         for fe in factor_effects:
             name = fe.get("factor")
@@ -720,13 +728,13 @@ def main():
         if split:
             print(
                 "\n== FACTOR IMPORTANCE (model estimates: the policy lift split by design factor; each factor's "
-                "level effects weighted by the policy's traffic on each level, and the interaction term that the "
-                "product of the factor uplifts leaves; shares sum to 1) =="
+                "uplift is the live policy over that factor's reference policy, and the interaction term that the "
+                "product of the factor uplifts leaves; shares sum to 1, also when the lift is negative, and the "
+                "bracket is the interval of the per-draw share) =="
             )
             terms = [(t.get("factor"), t) for t in split.get("factors") or []] + [("interaction term", split.get("interaction") or {})]
             for name, t in terms:
-                share = t.get("share")
-                share_txt = f"  {share * 100:.0f}% of the policy lift" if share is not None else ""
+                share_txt = f"  {fmt_share(t)} of the policy lift" if t.get("share") is not None else ""
                 print(f"  {str(name):<24} uplift {fmt_iv(t.get('uplift'))}{share_txt}")
     else:
         print("\n== FACTOR UTILITIES (model estimates: mean E[r] over other factors, vs level 0) ==")
