@@ -6,11 +6,12 @@ Levered's bandit is a **Bayesian factorization machine** driven by **Thompson sa
 
 Every model figure comes from the posterior store: thousands of joint draws from the posterior, queried at runtime. <!-- LEGACY(model-source) --> (An optimization created before the store, `model.source == "bandit"`, carries the model's own summaries instead, in the same shape; see [Optimizations from before the store](#optimizations-from-before-the-store).) The pack reduces each to `{lo, mid, hi}`, a credible interval and its median; each variant's `reward` in `model.variants` is one. Always carry the uncertainty into the read: a 12% lift with an interval of [−3%, +27%] is not a winner, it's a "keep running." Thin exposures → wide intervals.
 
-## Baseline = all-first-level
+## The reference follows the control type
 
-The reference variant is the index-0 level of every factor. Lift for any variant is `(p_variant − p_baseline) / p_baseline`. This is why the baseline level is never pruned — it's the measurement anchor. Levered also forces traffic to the baseline (the holdout is served the baseline), so it stays well-measured even when the bandit's own weight on it reaches zero.
-
-The API, not the key convention, says which variant that is: each variant in `results` carries `is_baseline`, and `results.stats.reference` says what every lift figure is measured against — `"baseline"` or, for an optimization created without one (`has_baseline: false`), `"equal_split"`.
+`control_type` on the optimization says what every lift figure is measured against:
+- `variant`: the baseline variant, named when the optimization was created (the variant in `results` with `is_baseline`). Lift for any variant is `(p_variant − p_baseline) / p_baseline`. This is why the baseline's levels are never pruned — it's the measurement anchor. The holdout is served the baseline, so it stays well-measured even when the bandit's own weight on it reaches zero.
+- `external`: the current version the holdout keeps, which is none of the variants. Holdout users train the model as that version, so the model's lifts are against it, adjusted like every variant's. Model versions trained before that have no current version: their lifts are null, so a day without lift in the history is one of those, not a zero. No variant carries `is_baseline`.
+- `none`: an even split of traffic across the variants (below).
 
 ## No baseline = even split
 

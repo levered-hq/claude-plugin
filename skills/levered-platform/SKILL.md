@@ -44,10 +44,9 @@ levered optimizations create \
   --reward-name reward \
   --reward-type bool \
   --excluded-combinations '[{"visual":"family_photo","message":"tax_complexity"}]'  # optional; never serve these factor-level combos (last resort — prefer a coherent factor design)
-  --control variant|external|none                          # optional; what users outside the optimization see: a variant (default), a version that is none of the variants (needs a holdout; holdout never trains), or nothing (every variant new: no holdout, no guardrails)
+  --control variant|external|none                          # optional; what users outside the optimization see: a variant (default), a version that is none of the variants (needs a holdout; the holdout trains the model as that version), or nothing (every variant new: no holdout, no guardrails)
   --holdout 10                                             # optional; share of traffic kept as the holdout, 0-50 (default 10)
-  --baseline '{"headline":"Fast"}'                         # optional, with --control variant; today's experience when it isn't every factor's first level
-  --no-baseline                                            # legacy alias for --control none
+  --baseline '{"headline":"Fast"}'                         # required with --control variant (the default): today's experience, one level per factor
                                                            # Create optimization
 levered optimizations update <id> --status live            # Update optimization status
 levered optimizations update <id> \
@@ -58,10 +57,10 @@ levered optimizations update <id> --name "..." --description "..."   # Rename / 
 levered optimizations label <id> --factor <name> \
   [--context | --level <value|level-id>] --label "..." --description "..." [--hypothesis "..."]  # Display label + description of a factor or level — any status; what the SDK serves is unchanged ("" clears)
 levered optimizations update <id> --status paused          # Pause (resume with --status live)
-levered optimizations update <id> --no-baseline            # Remove the baseline: lift vs an even split. Holdout must be 0 and guardrails removed first (API returns 400 otherwise)
-levered optimizations update <id> --baseline               # Restore the baseline (all-first-levels variant)
+levered optimizations update <id> --control none          # Every variant new: lift vs an even split. Holdout must be 0 and guardrails removed first (API returns 400 otherwise)
+levered optimizations update <id> --control variant --baseline-variant '{"headline":"Fast"}'  # Make a variant the baseline again
 levered optimizations variants list <id>                   # Variant numbers with baseline / paused / excluded state
-levered optimizations variants pause <id> <n> -y           # Stop serving variant #n — DRAFT ONLY; never the baseline, at least 2 stay active
+levered optimizations variants pause <id> <n> -y           # Stop serving variant #n — DRAFT ONLY; at least 2 stay active (a paused baseline is still served to the holdout)
 levered optimizations variants resume <id> <n>             # Serve a paused variant again — DRAFT ONLY
 levered optimizations ship <id> -y                         # Ship winner: leading variant per context to 100% of traffic; learning + holdout off, results frozen. Undo: update --status live
 levered optimizations stop <id> -y                         # Stop for good (status completed): users get the app's fallback; cannot be resumed
