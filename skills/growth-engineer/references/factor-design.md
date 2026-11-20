@@ -32,7 +32,7 @@ Excluding combinations is a last resort for clashes no factor cut avoids: `--exc
 
 **Every level presents only what is true.** Each claim, number, price, guarantee, feature, quote, rating and description of what the product does must exist in the code, on the live site, or in an opted-in knowledge document — and a document that contradicts a claim rules it out. Reframing, reordering, showing or hiding real content is the space to work in. If you don't know whether something is real, ask the user, and leave out what you can't confirm. When a level rests on a knowledge document, name the document in the proposal.
 
-Present a later design the way phase 1 §5 presents the first: the problems it answers, then the changes, the bet in plain words, the evidence in a clause, each step with its card.
+Present a later design the way phase 1 §5 presents the first: the problems it answers with their hypotheses, then the reward and the factors with their levels, the evidence in a clause, each step ending with its question.
 
 ## The user's own hypotheses
 

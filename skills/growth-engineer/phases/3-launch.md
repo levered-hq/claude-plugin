@@ -99,4 +99,4 @@ Once it's live, capture every variant for the dashboard **in the background** ([
 
 ## 10. Summarize
 
-Three or four sentences: what's live (name, ID, dashboard link), what's being tried and why, the time to settle, what's theirs to do, and that they can ask how it's going any time. If research or analytics didn't happen and would help, offer it for the wait with **[Run it (Recommended)] [Not now]**. Name Levered's terms once: in the dashboard, what we're changing are *factors* and the options are *levels*.
+Three or four sentences: what's live (name, ID, dashboard link), what's being tried and why, the time to settle, what's theirs to do, and that they can ask how it's going any time. If research or analytics didn't happen and would help, offer it for the wait with **[Run it (Recommended)] [Not now]**.

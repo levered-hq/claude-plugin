@@ -6,7 +6,7 @@ Goal: within a minute or two, learn what the user wants more of and show them so
 
 **Until then, only read** — with the Read tool, several files at once, and Glob and Grep to find and search. They need no permission, while before the plugin is installed every shell command is a prompt. No installs.
 
-**Words:** describe Levered as it is — versions of the page, live traffic, the model learning which works best. In this file, "options" means the choices you offer the user, except in the design table, where a change's options are its variations.
+**Words:** describe Levered as it is — versions of the page, live traffic, the model learning which works best. The problems (step 1) are in the visitor's terms. The design (step 2) is in Levered's terms: factors, levels, variants and the reward, each said once in a clause where it first appears. In this file, "options" means the choices you offer the user.
 
 ## 1. Read the project in one go
 
@@ -52,45 +52,45 @@ Read it the way a first-time visitor would, with your knowledge of growth, UX re
 
 ## 5. Show what you found, in two steps
 
-How Levered works waits until launch. Names, classes, file paths and event names stay in the code: write in the visitor's terms, plain markdown, long quotes cut with "…".
+How the model works waits until launch. Classes, file paths and event names stay in the code. Plain markdown, long quotes cut with "…".
 
-### Step 1: what holds them back
+### Step 1: what holds them back, and the hypotheses
 
-The insights alone, before any change: so the user agrees on the problem first.
+The problems and one hypothesis for each, before any design: so the user agrees on what to test first.
 
 > <One line on how you looked at the page.>
 >
 > **What holds <visitors or users, by surface> back from <the goal, in plain words>**
 >
-> | | Problem | What we saw |
-> |---|---|---|
-> | 1 | **<The belief about the visitor, as a short claim>** | <One piece of evidence: today's real copy or element, quoted or named> |
-> | … | … | … |
+> | | Problem | What we saw | Hypothesis |
+> |---|---|---|---|
+> | 1 | **<The belief about the visitor, as a short claim>** | <One piece of evidence: today's real copy or element, quoted or named> | <What would change and why it should move the goal> |
+> | … | … | … | … |
 >
 > <Only when you read real numbers: one line on where they actually drop off and what's at stake, with the number and its source.>
 >
 > <The question.> **1.** <Your pick> (recommended) · **2.** … · **3.** …
 
-The 3–5 problems you'd act on, most important first. About 10 words per cell: the problem as a short claim; the evidence as only what a visitor sees, quoted or named, long quotes cut with "…" — what it means is already in the claim. The question asks whether the <n> problems above are the ones to work on; first **Show what I'd try**; then, only when §4 found something to strengthen it with, one option named for it (checking their analytics, researching their market in about 10 minutes, or both); last **Change these, or tell me your own hunch**.
+The 3–5 problems you'd act on, most important first. About 10 words per cell, up to 15 for the hypothesis: the problem as a short claim; the evidence as only what a visitor sees, quoted or named, long quotes cut with "…" — what it means is already in the claim; the hypothesis as the direction of the change and its expected effect, without levels yet. The question asks whether the <n> hypotheses above are the ones to test; first **Show the factors and levels**; then, only when §4 found something to strengthen it with, one option named for it (checking their analytics, researching their market in about 10 minutes, or both); last **Change these, or tell me your own hunch**.
 
 When they change the problems, or bring a hunch, show them revised and ask the same question again. When they want to reason it out, rank as many hypotheses as the evidence supports, most likely first (who is stopped by what, the evidence, how we'd know), with your recommendation ([../references/factor-design.md](../references/factor-design.md), "The user's own hypotheses").
 
-### Step 2: what we'd try
+### Step 2: the design
 
-Once they confirm the problems: the design, one change per problem it answers. Exact wording is reviewed later, on the page itself.
+Once they confirm the hypotheses: the reward and the full design, every factor with all of its levels. Final copy is reviewed later, on the page itself.
 
-> **What we'd try**
+> **Reward:** <their goal as the event that counts>. <One clause on why this event: its volume, or what records it.>
 >
-> | Change | Options | For example |
+> | Factor | Levels | Why |
 > |---|---|---|
-> | <n>. <The change, for problem n, in a few words> | <How many, today's included> | <One new option, quoted or named> |
+> | `<factor_name>` | `<today>` (control)<br>`<level>`<br>`<level>` | <The hypothesis it carries out. What each new level shows, quoted when it is copy.> |
 > | … | … | … |
 >
-> <The number of versions> versions; **a win** = <their goal, in plain words>; at <the traffic you assumed>, about <a range> to settle — tell me if traffic is very different.
+> <a × b × c> = **<n> variants**. At <the traffic you assumed>, about <a range> to settle — tell me if traffic is very different.
 >
 > <The question.> **1.** <Your pick> (recommended) · **2.** … · **3.** …
 
-Today's page is the baseline, so it gets no row; versions appear only as a count. About 10 words per cell: one new option, quoted or named; the others wait for the build. The question asks whether to build the <n> changes above: first, worded exactly, **Build these so I can click through**; then the strengthen option if they haven't used it; last **Change the design first**.
+One row per factor, in the order of the hypotheses. Factor and level names are short and in lower_snake_case, exactly as the code and Levered will receive them; a level name says what the variant is (`pills`, `cards`; `empty`, `prefilled`), never the content itself. The Levels cell holds only the names: every level, each in backticks on its own line (`<br>`), today's first and marked (control). With no baseline (§4), no level is marked and the line under the table says so. The Why cell holds the prose: one or two sentences. Under the table, anything that stays the same in every variant and matters for reading the design, in one line. The question asks whether to build the <n> factors above: first, worded exactly, **Build these so I can click through**; then the strengthen option if they haven't used it; last **Change the design first**.
 
 ### If they pick the strengthen option
 

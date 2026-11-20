@@ -8,7 +8,7 @@
     {
       "name": "levered",
       "description": "Levered optimization platform: create and manage real-time product optimization and personalization directly from Claude Code",
-      "version": "0.7.16",
+      "version": "0.7.17",
       "source": {
         "source": "github",
         "repo": "levered-hq/claude-plugin"
