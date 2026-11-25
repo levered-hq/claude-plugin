@@ -67,7 +67,7 @@ Design factors and context factors answer "what is this worth?" with two differe
 
 **Design factors: factor effect and level effects** (`model.factor_effects`, one entry per design factor, ranked by factor effect; each has `effect` and `relative` for the factor and a `levels` list with the same per level). Both are anchored on the current policy:
 
-- A level's reward mixes the other design factors the way the Thompson policy mixes them within that level in each segment (its weight on each servable variant with that level, renormalized; an even split where the policy never picks the level), averaged over segments by traffic.
+- A level's reward mixes the other design factors the way the Thompson policy mixes them within that level in each segment (its weight on each servable variant with that level, renormalized; where the policy never picks the level, its mix of the other factors overall), averaged over segments by traffic.
 - The reference is the reward of the baseline variant's level, or, without a baseline, the level rewards mixed by each level's share of the servable variants.
 - **Level effect:** level reward vs. the reference. The baseline's level is exactly 0.
 - **Factor effect:** what optimizing the factor is worth when every segment takes its own best level, per draw, vs. the reference. Per draw it is at least every level effect, and it is never negative. Within one segment it is exactly the best level effect.
