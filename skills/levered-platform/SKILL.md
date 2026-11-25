@@ -30,7 +30,7 @@ levered api-keys revoke <id>             # Revoke a key
 ```
 levered optimizations list                                 # List all optimizations
 levered optimizations show <id>                            # Show optimization details
-levered optimizations results <id>                         # Get results: lift, variants, factor and level effects, factor importance, context importance (model figures; `model.source` says where from)
+levered optimizations results <id>                         # Get results: lift, variants, factor and level effects, factor importance, context importance (model figures, from the posterior store)
 levered optimizations lift-history <id> [--days N]         # The model's policy/ceiling lift, one point per day
 levered optimizations progress <id>                        # Days running, enrollment per arm, progress-to-best/convergence
 levered optimizations guardrails <id>                      # Guardrail metrics: bandit vs. holdout, lift, ok/violated status
@@ -78,14 +78,13 @@ levered optimizations observations <id>                    # View observations/t
 ### Models
 ```
 levered models list                      # List all models
-levered models state <model-id>          # Training counts: exposures and observed reward per variant
 levered models delete <model-id>         # Delete a model
 ```
 
 ### Posterior
 ```
 levered posterior query <optimization-id> --sql '<sql>' [--param name=value] [--version <v>] [--json]
-                                         # Read-only SQL over the optimization's posterior draws: the source of every model figure (optimizations with model_source "store")
+                                         # Read-only SQL over the optimization's posterior draws: the source of every model figure
 ```
 
 ### Warehouse & Metrics

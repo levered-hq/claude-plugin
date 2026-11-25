@@ -10,14 +10,13 @@ Sections printed: CONFIG (with a config hash for update-mode comparisons),
 VALIDATION (holdout share by day, enrollment reconciliation, baseline-sanity
 gate), MEASURED (published + windowed recomputes on the same estimand),
 GUARDRAILS, MODELED, VARIANTS, OUTCOME MIX (with monthly translation),
-FACTOR EFFECTS (FACTOR UTILITIES for older optimizations), INTERACTIONS (day-controlled F-test + full deviation
+FACTOR EFFECTS, INTERACTIONS (day-controlled F-test + full deviation
 matrix), CONTEXT (the model's per-context figures, measured lift per context
 level, winner per level, and the value personalization added over the single
 best variant; printed only when the model has context factors). Model figures
 come from the pack's `model` block (null before the model has an estimate) and
-their trend from `model_history`: the posterior store's, or, for an
-optimization that predates the store (`model.source == "bandit"`,
-LEGACY(model-source)), bandit's own. Every derived figure is labeled with its basis so the report
+their trend from `model_history`, both from the posterior store. Every derived
+figure is labeled with its basis so the report
 writer never has to re-derive one with ad hoc warehouse SQL.
 """
 
@@ -48,14 +47,6 @@ def fmt_iv(iv, digits=2):
     if not iv:
         return "no estimate"
     return f"{fmt_pct(iv['mid'], digits)} [{fmt_pct(iv['lo'], digits)}, {fmt_pct(iv['hi'], digits)}]"
-
-
-def fmt_imp(iv, kind):
-    """An importance entry: a lift ("worth +x%"), or, for importance of kind
-    'share', a share of the reward's variance."""
-    if kind == "share":  # LEGACY(model-source): bandit's variance shares.
-        return f"share {iv['mid']:.3f} [{iv['lo']:.3f}, {iv['hi']:.3f}]" if iv else "no estimate"
-    return f"worth {fmt_iv(iv)}"
 
 
 def level_values(factor):
@@ -238,21 +229,12 @@ def model_context(model, labels):
         for t in split["factors"]:
             print(f"context uplift {t['factor']}: {fmt_iv(t['uplift'])}; {share(t)}  [model estimate; not comparable with design factors]")
         print(f"context interaction term: {fmt_iv(split['interaction']['uplift'])}; {share(split['interaction'])}  [model estimate]")
-    else:  # LEGACY(model-source)
-        legacy = (model.get("importance") or {}).get("kind") == "share"
-        for f, iv in ((model.get("importance") or {}).get("context") or {}).items():
-            print(
-                f"context importance {f}: worth {fmt_iv(iv)}  [model estimate; "
-                f"{'oracle lift; design importance is a share, not comparable' if legacy else 'not comparable with factor effects'}]"
-            )
     pers = model.get("personalization")
     if pers:
         print(
             f"personalization (contextual policy vs the same policy blind to context): {fmt_iv(pers['lift'])}, "
             f"P(> 0) = {pers['p_positive']:.2f}  [model estimate]"
         )
-    elif model.get("source") == "bandit":  # LEGACY(model-source)
-        print("personalization: no model figure (the optimization predates the posterior store); lead with context importance")
 
     def reward(x):
         return f"{x['mid']:.4g}" if x else "n/a"
@@ -261,7 +243,6 @@ def model_context(model, labels):
     if segments:
         print("segments (one per full context; weight = share of traffic):")
         for s in segments:
-            # LEGACY(model-source): a 'bandit' segment carries rewards only.
             lift = (
                 f"  policy lift {fmt_iv(s.get('policy_lift'))}  P(beats ref) {s['p_beats_reference']:.2f}"
                 if s.get("p_beats_reference") is not None else ""
@@ -580,8 +561,8 @@ def main():
         top_variant_key = max(modeled.values(), key=lambda v: v.get("share") or 0)["variant_key"]
     for point in ts:
         vv = point.get("variants") or {}
-        tot = sum(x.get("exposures", 0) for x in vv.values())
-        lead = (vv.get(top_variant_key) or {}).get("exposures", 0)
+        tot = sum(x.get("users", 0) for x in vv.values())
+        lead = (vv.get(top_variant_key) or {}).get("users", 0)
         if tot:
             leader_share_by_day[point.get("date")] = lead / tot
     since = args.since
@@ -628,10 +609,7 @@ def main():
     reference = (results.get("stats") or {}).get("reference") or "baseline"
     print(f"\n== MODELED (label as model estimates; lifts vs the {reference.replace('_', ' ')}) ==")
     if model:
-        if model.get("source") == "bandit":  # LEGACY(model-source)
-            print("source: bandit's own figures (the optimization predates the posterior store)")
-        else:
-            print(f"source: posterior store, version {model.get('model_version')}")
+        print(f"source: posterior store, version {model.get('model_version')}")
         p_beats = model.get("p_beats_reference")
         print(f"Lift (now, policy): {fmt_iv(model.get('policy_lift'))}")
         print(f"Lift (best variant, ceiling; shrunk halfway toward the policy): {fmt_iv(model.get('ceiling_lift'))}")
@@ -664,7 +642,7 @@ def main():
         )
         print(
             f"  #{v.get('number')}  {json.dumps(v.get('variant'))}{'  (baseline)' if v.get('is_baseline') else ''}  "
-            f"exposures={v.get('exposures')}  rate={v.get('rate'):.4g}  {modeled_txt}"
+            f"users={v.get('users')}  matured={v.get('matured_users')}  rate={v.get('rate'):.4g}  {modeled_txt}"
         )
 
     # ── OUTCOME MIX ───────────────────────────────────────────────────────
@@ -702,10 +680,9 @@ def main():
         print(f"traffic: ~{per_day:.0f} optimized users/day over the last {len(recent)} full days → ~{per_day * 30:,.0f}/month (for the absolute translation)")
 
     # ── FACTOR EFFECTS (model estimates) ──────────────────────────────────
-    importance = (model or {}).get("importance") or {}
     factor_effects = (model or {}).get("factor_effects")
-    design_imp = importance.get("design") or {}  # LEGACY(model-source): bandit's variance shares
     fnames = [f.get("name") for f in factors]
+    ranked = []
     if factor_effects is not None:
         print(
             "\n== FACTOR EFFECTS (model estimates; the dashboard's figures: each level vs the reference level, "
@@ -736,41 +713,8 @@ def main():
             for name, t in terms:
                 share_txt = f"  {fmt_share(t)} of the policy lift" if t.get("share") is not None else ""
                 print(f"  {str(name):<24} uplift {fmt_iv(t.get('uplift'))}{share_txt}")
-    else:
-        print("\n== FACTOR UTILITIES (model estimates: mean E[r] over other factors, vs level 0) ==")
-        if importance.get("kind") == "share":
-            # LEGACY(model-source): bandit's design importance.
-            for f, iv in sorted(design_imp.items(), key=lambda kv: -((kv[1] or {}).get("mid") or 0)):
-                print(
-                    f"  importance {f}: {fmt_imp(iv, 'share')}  (share of the reward's variance its main effect "
-                    "carries; with the interaction share they sum to 1; not a lift)"
-                )
-        if modeled and fnames:
-            for f in factors:
-                name, levels = f.get("name"), level_values(f)
-                means = {}
-                for lv in levels:
-                    vs = [reward_mid(v) for v in variants if str((v.get("variant") or {}).get(name)) == lv and reward_mid(v) is not None]
-                    if vs:
-                        means[lv] = sum(vs) / len(vs)
-                if means and levels and levels[0] in means:
-                    base = means[levels[0]]
-                    for lv in levels:
-                        if lv in means:
-                            print(f"  {name}={lv:<20} {means[lv]:.4g}  ({fmt_pct((means[lv] - base) / base)} vs level 0)")
-        ranked = sorted(design_imp, key=lambda f: -((design_imp[f] or {}).get("mid") or 0))
 
     # ── INTERACTIONS (cube basis, optimized arm, day-controlled) ──────────
-    if importance.get("interaction"):
-        print(
-            f"\n== INTERACTIONS ==\nmodel interaction{' importance' if importance.get('kind') == 'share' else ''}: {fmt_imp(importance['interaction'], importance.get('kind') or 'lift')}  "
-            + (
-                # LEGACY(model-source)
-                "(share of the reward's variance no main effect explains on its own; same scale as factor importance)"
-                if importance.get("kind") == "share"
-                else "(the best design over each factor's best level picked on its own, as the factor effects pick it; near zero = no interaction)"
-            )
-        )
     if len(fnames) >= 2 and rows:
         fa = ranked[0] if ranked else fnames[0]
         fb = ranked[1] if len(ranked) > 1 else next(f for f in fnames if f != fa)
@@ -862,7 +806,7 @@ def main():
         print("(no measured per-level lift or empirical cross-check from this pack; report the model's figures only)")
 
     print("\nBases reminder: published/holdout_daily figures share the platform estimand (weight of first in-window matched")
-    print("outcome per user); the cube's mix shares are user counts on the same attribution. Variant rates are per exposure.")
+    print("outcome per user); the cube's mix shares are user counts on the same attribution. Variant rates are per matured user, lifetime.")
 
 
 if __name__ == "__main__":

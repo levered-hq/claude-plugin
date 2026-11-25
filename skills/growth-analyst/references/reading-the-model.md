@@ -4,7 +4,7 @@ Levered's bandit is a **Bayesian factorization machine** driven by **Thompson sa
 
 ## Posterior, not point estimate
 
-Every model figure comes from the posterior store: thousands of joint draws from the posterior, queried at runtime. <!-- LEGACY(model-source) --> (An optimization created before the store, `model.source == "bandit"`, carries the model's own summaries instead, in the same shape; see [Optimizations from before the store](#optimizations-from-before-the-store).) The pack reduces each to `{lo, mid, hi}`, a credible interval and its median; each variant's `reward` in `model.variants` is one. Always carry the uncertainty into the read: a 12% lift with an interval of [−3%, +27%] is not a winner, it's a "keep running." Thin exposures → wide intervals.
+Every model figure comes from the posterior store: thousands of joint draws from the posterior, queried at runtime. The pack reduces each to `{lo, mid, hi}`, a credible interval and its median; each variant's `reward` in `model.variants` is one. Always carry the uncertainty into the read: a 12% lift with an interval of [−3%, +27%] is not a winner, it's a "keep running." Thin exposures → wide intervals.
 
 ## The reference follows the control type
 
@@ -53,13 +53,13 @@ Symptoms and the check:
 
 This is the same failure family as pooling across a holdout-% change (SKILL.md validation step a): a numerator weighted to one calendar period, a denominator weighted to another, and drift booked as lift.
 
-## Per-user vs per-exposure (#286)
+## Counts are users
 
-The holdout comparison is per *user*. The per-variant `rate` in `results` is per *exposure* when the per-user rollup isn't populated (the fields are then named `exposures`/`conversions`, not `users`/`converting_users`). A user can be exposed many times, so the two bases are not comparable — never quote them side by side as if they were, and label exposure-based columns **Exposures**.
+Every count in `results` (per variant, per segment, and per day in `time_series`) is users, each counted once at their first exposure, with holdout users left out. It is the rollup the model trains on. The holdout comparison is per user too, from its own measurement. Exposure *events* appear only in the warehouse health checks (`diagnostics`), never next to a rate.
 
 ## Matured users only
 
-Each variant also carries `matured_users` / `matured_converting_users`: the users whose conversion window has closed. The model trains on those alone, and the dashboard's Observed rate and vs-baseline lift are computed from them. Quote the matured pair when reading a variant's observed rate; `users - matured_users` are still inside the window and can't have converted yet. Counting them makes the variant that most recently received traffic look worst — which is usually the one the model is routing traffic *to* — and that reading contradicts Probability of best (Taxfix, 2026-10-19: variant 2 led on probability of best and read -7.7% vs baseline because half its users were still in the 24h window). The fields are null when the rollup predates them; fall back to `users` / `converting_users` then and say the rate includes pending users.
+Each variant also carries `matured_users` / `matured_converting_users`: the users whose conversion window has closed. The model trains on those alone, and the dashboard's Observed rate and vs-baseline lift are computed from them. Quote the matured pair when reading a variant's observed rate; `users - matured_users` are still inside the window and can't have converted yet. Counting them makes the variant that most recently received traffic look worst — which is usually the one the model is routing traffic *to* — and that reading contradicts Probability of best (Taxfix, 2026-10-19: variant 2 led on probability of best and read -7.7% vs baseline because half its users were still in the 24h window).
 
 ## Factor effects and importance
 
@@ -104,16 +104,6 @@ These lead the "what context added" claim. A different `leader` by segment with 
 The pack is fixed queries over the store. Anything else is a `levered posterior query <id> --sql … --json`; build it the way the pack's figures are built, so what you quote matches the dashboard. The store describes itself: `duckdb_views()` and `duckdb_functions()` (`WHERE NOT internal`) list its views and macros, each with what it means as `comment`. For the headline's trend, `levered optimizations lift-history <id> [--days N]`.
 
 Before the first posterior is published the route answers 404 ("No posterior has been published for this optimization yet"): traffic is an even split over the servable variants and there is no model estimate.
-
-<!-- LEGACY(model-source): this whole section. -->
-## Optimizations from before the store
-
-An optimization created before the posterior store has `model_source: "bandit"`, and its pack's `model.source` is `"bandit"`: the figures are the model's own summaries, so its numbers did not change when the store arrived. Policy and ceiling lift, P(beats the reference), progress, each variant's `share` and `reward`, and the trend in `model_history` mean exactly what they mean above. What differs:
-
-- **Factor effects:** once bandit reports them, a `"bandit"` pack carries `model.factor_effects` and lift-kind importance with the store's definitions (no absolute `effect`, lifts only): read them exactly as for a store pack.
-- **Importance** (`model.importance.kind == "share"`, a fit from before that): design-factor and interaction importance are shares of the reward's variance: the share of what moves the reward that each factor's main effect carries, and the share only combinations of factors explain. They sum to 1 together, so "the CTA carries 60% of what moves the reward, combinations 10%" is right, and "the CTA is worth +60%" is wrong. A small share means the factor moves the reward little relative to the others, not that optimizing it is worth nothing in absolute terms. Context importance is a lift ("worth +x%") on both sources, and is not comparable with the shares.
-- **Context:** there is no personalization figure, and each segment carries the policy's reward and the best variant's reward only. "What context added" leads with the context importance and the cross-check.
-- **No posterior queries:** the pack and `lift-history` are the whole model view. Do not mix in `levered posterior query` figures: where the store answers at all, its numbers are not the ones this optimization reports.
 
 ## The FM models interactions
 
