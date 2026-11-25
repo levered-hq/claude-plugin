@@ -706,7 +706,8 @@ def main():
             print(
                 "\n== FACTOR IMPORTANCE (model estimates: the policy lift split by design factor; each factor's "
                 "uplift is the live policy over that factor's reference policy, and the interaction term that the "
-                "product of the factor uplifts leaves; shares sum to 1, also when the lift is negative, and the "
+                "product of the factor uplifts leaves; shares sum to 1, also when the lift is negative, except "
+                "against the current version, where the remainder is what an even split earns over it; the "
                 "bracket is the interval of the per-draw share) =="
             )
             terms = [(t.get("factor"), t) for t in split.get("factors") or []] + [("interaction term", split.get("interaction") or {})]
