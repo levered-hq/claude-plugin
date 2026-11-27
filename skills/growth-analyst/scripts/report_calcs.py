@@ -686,7 +686,7 @@ def main():
     if factor_effects is not None:
         print(
             "\n== FACTOR EFFECTS (model estimates; the dashboard's figures: each level vs the reference level, "
-            "the other factors mixed the way the current policy mixes them within each level) =="
+            "the other factors mixed by each level's own Thompson policy) =="
         )
         for fe in factor_effects:
             name = fe.get("factor")
