@@ -57,7 +57,7 @@ levered optimizations update <id> --name "..." --description "..."   # Rename / 
 levered optimizations label <id> --factor <name> \
   [--context | --level <value|level-id>] --label "..." --description "..." [--hypothesis "..."]  # Display label + description of a factor or level — any status; what the SDK serves is unchanged ("" clears)
 levered optimizations update <id> --status paused          # Pause (resume with --status live)
-levered optimizations update <id> --control none          # Every variant new: lift vs an even split. Holdout must be 0 and guardrails removed first (API returns 400 otherwise)
+levered optimizations update <id> --control none          # Every variant new: lift vs an even split. Holdout must be 0 (API returns 400 otherwise); guardrails need a holdout, so they are removed
 levered optimizations update <id> --control variant --baseline-variant '{"headline":"Fast"}'  # Make a variant the baseline again
 levered optimizations variants list <id>                   # Variant numbers with baseline / paused / excluded state
 levered optimizations variants pause <id> <n> -y           # Stop serving variant #n — DRAFT ONLY; at least 2 stay active (a paused baseline is still served to the holdout)

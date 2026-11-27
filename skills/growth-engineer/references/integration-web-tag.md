@@ -30,6 +30,15 @@ The tag sends the **exposure** to the site's own analytics (`dataLayer`, `gtag`,
 - **Connected warehouse:** the site's analytics already lands exposures and conversions there; the reward metric reads them.
 - **Managed warehouse:** the conversion has to reach the ingestion API (`/api/v2/ingest/rewards`) with the same anonymous id — usually from the form handler or backend that records the signup. If the site has no backend you can reach, say so plainly: without rewards, the model can't learn.
 
+## Consent
+
+The tag reads consent on page load, from `window.leveredConsent` (a boolean or a function returning one), then from Google Consent Mode's `analytics_storage`. It also follows later changes without a reload: a Consent Mode `consent` update, or `window.dispatchEvent(new CustomEvent('levered:consent', { detail: { granted: true } }))` from a custom banner.
+
+- **Denied:** the visitor sees the original page, gets no cookie, sends nothing to Levered, and any stored Levered id or token is removed.
+- **No signal:** the tag runs, unless the config sets `"require_consent": true`. Then the visitor stays on the original page, untracked, until they grant. On a grant the variant is swapped in on the page they are on.
+- **Withdrawn mid-visit:** the Levered id and token are removed and nothing more is sent; the page stays as it is.
+- For sites with EU or UK visitors, set `require_consent` and confirm the consent banner sets the signal before the tag. Otherwise every visitor stays on the original page and the model gets no data.
+
 ## Evolving it
 
 On the tag, a new copy, visibility or layout level is a binding change, not a code change: no PR and no deploy. It still needs the user's approval, and it waits for the platform to accept new levels on a live optimization.
